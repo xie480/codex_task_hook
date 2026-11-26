@@ -178,7 +178,7 @@ class ReviewReportWriter:
         timestamp: str,
         report_bytes: bytes,
     ) -> Path:
-        """将内容写入同目录临时文件后原子改名并保留同秒报告。
+        """先落盘同目录临时文件，再原子创建硬链接且拒绝覆盖。
 
         Args:
             report_directory: 已存在且已校验的报告目录。
@@ -223,7 +223,7 @@ class ReviewReportWriter:
                 )
 
                 try:
-                    os.rename(
+                    os.link(
                         temporary_path,
                         report_path,
                     )
