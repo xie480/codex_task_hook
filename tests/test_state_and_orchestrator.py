@@ -50,7 +50,9 @@ def make_task_state(
 class StateAndOrchestratorTests(unittest.TestCase):
     """验证每轮任务状态独立，Hook 故障时安全放行。"""
 
-    def test_different_sessions_and_turns_have_isolated_state(self):
+    def test_different_sessions_and_turns_have_isolated_state(
+        self,
+    ):
         """验证会话或轮次不同的任务不会覆盖彼此状态。"""
 
         from codex_task_review.state import TaskStateStore
@@ -99,7 +101,9 @@ class StateAndOrchestratorTests(unittest.TestCase):
             ],
         )
 
-    def test_parallel_state_writes_do_not_overwrite_other_tasks(self):
+    def test_parallel_state_writes_do_not_overwrite_other_tasks(
+        self,
+    ):
         """验证并行写入使用独立文件且任务状态均可读取。"""
 
         from codex_task_review.state import TaskStateStore
@@ -143,7 +147,9 @@ class StateAndOrchestratorTests(unittest.TestCase):
             ],
         )
 
-    def test_corrupt_state_is_treated_as_missing(self):
+    def test_corrupt_state_is_treated_as_missing(
+        self,
+    ):
         """验证损坏状态文件不会触发 Git Diff 回退。"""
 
         from codex_task_review.state import TaskStateStore
@@ -169,7 +175,9 @@ class StateAndOrchestratorTests(unittest.TestCase):
 
         self.assertIsNone(loaded)
 
-    def test_stop_without_matching_state_never_runs_git_or_diff(self):
+    def test_stop_without_matching_state_never_runs_git_or_diff(
+        self,
+    ):
         """验证缺少对应状态时 Stop 不查仓库也不生成整个分支 Diff。"""
 
         from codex_task_review.orchestrator import TaskOrchestrator
@@ -198,7 +206,9 @@ class StateAndOrchestratorTests(unittest.TestCase):
             result["systemMessage"],
         )
 
-    def test_stop_hook_active_is_a_safe_no_op(self):
+    def test_stop_hook_active_is_a_safe_no_op(
+        self,
+    ):
         """验证 Stop 重入时立即放行且不执行快照。"""
 
         from codex_task_review.orchestrator import TaskOrchestrator
@@ -225,16 +235,29 @@ class StateAndOrchestratorTests(unittest.TestCase):
             output.to_dict()["systemMessage"],
         )
 
-    def test_prompt_submit_stores_snapshot_and_stop_returns_task_diff(self):
-        """验证开始 Hook 保存快照，结束 Hook 精确获取本轮变化。"""
+    def test_prompt_submit_stores_snapshot_and_stop_invokes_reviewer(
+        self,
+    ):
+        """验证任务快照驱动 Reviewer 只审查本轮 Diff。"""
 
+        from unittest.mock import Mock
+
+        from codex_task_review.models import ReviewResult
         from codex_task_review.orchestrator import TaskOrchestrator
         from codex_task_review.state import TaskStateStore
 
         with temporary_workspace() as workspace:
             with temporary_git_repository() as repo_root:
                 data_root = workspace / "plugin-data"
-                orchestrator = TaskOrchestrator(data_root)
+                review_runner = Mock()
+                review_runner.run.return_value = ReviewResult(
+                    status="completed",
+                    raw_output="No findings",
+                )
+                orchestrator = TaskOrchestrator(
+                    data_root,
+                    review_runner=review_runner,
+                )
                 prompt_input = HookInput.from_payload(
                     {
                         "hook_event_name": "UserPromptSubmit",
@@ -275,13 +298,18 @@ class StateAndOrchestratorTests(unittest.TestCase):
                 )
 
         self.assertIn(
-            "review_required",
+            "review_completed",
             stop_output.to_dict()["systemMessage"],
         )
-        self.assertIsNotNone(stored)
+        self.assertIsNone(stored)
+        review_runner.run.assert_called_once()
 
-    def test_stop_skips_small_bugfix_and_removes_only_its_state(self):
+    def test_stop_skips_small_bugfix_and_removes_only_its_state(
+        self,
+    ):
         """验证简单 Bug 修复跳过 Reviewer 并仅清理当前任务状态。"""
+
+        from unittest.mock import Mock
 
         from codex_task_review.orchestrator import TaskOrchestrator
         from codex_task_review.state import TaskStateStore
@@ -289,7 +317,11 @@ class StateAndOrchestratorTests(unittest.TestCase):
         with temporary_workspace() as workspace:
             with temporary_git_repository() as repo_root:
                 data_root = workspace / "plugin-data"
-                orchestrator = TaskOrchestrator(data_root)
+                review_runner = Mock()
+                orchestrator = TaskOrchestrator(
+                    data_root,
+                    review_runner=review_runner,
+                )
                 prompt_input = HookInput.from_payload(
                     {
                         "hook_event_name": "UserPromptSubmit",
@@ -326,17 +358,32 @@ class StateAndOrchestratorTests(unittest.TestCase):
             result["systemMessage"],
         )
         self.assertIsNone(stored)
+        review_runner.run.assert_not_called()
 
-    def test_stop_retains_state_for_reviewable_diff(self):
-        """验证待 Review 任务保留快照供后续 Reviewer 使用。"""
+    def test_stop_reports_reviewer_failure_without_blocking_and_cleans_state(
+        self,
+    ):
+        """验证 Reviewer 失败时 Hook 放行并清理本轮状态。"""
 
+        from unittest.mock import Mock
+
+        from codex_task_review.models import ReviewResult
         from codex_task_review.orchestrator import TaskOrchestrator
         from codex_task_review.state import TaskStateStore
 
         with temporary_workspace() as workspace:
             with temporary_git_repository() as repo_root:
                 data_root = workspace / "plugin-data"
-                orchestrator = TaskOrchestrator(data_root)
+                review_runner = Mock()
+                review_runner.run.return_value = ReviewResult(
+                    status="failed",
+                    raw_output="",
+                    error="Codex CLI unavailable",
+                )
+                orchestrator = TaskOrchestrator(
+                    data_root,
+                    review_runner=review_runner,
+                )
                 prompt_input = HookInput.from_payload(
                     {
                         "hook_event_name": "UserPromptSubmit",
@@ -368,12 +415,18 @@ class StateAndOrchestratorTests(unittest.TestCase):
                 )
 
         self.assertIn(
-            "review_required",
+            "review_failed",
             stop_output.to_dict()["systemMessage"],
         )
-        self.assertIsNotNone(stored)
+        self.assertTrue(
+            stop_output.to_dict()["continue"],
+        )
+        self.assertIsNone(stored)
+        review_runner.run.assert_called_once()
 
-    def test_hook_entrypoint_returns_one_json_object_for_invalid_input(self):
+    def test_hook_entrypoint_returns_one_json_object_for_invalid_input(
+        self,
+    ):
         """验证 Hook 入口收到无效 JSON 时仍只输出合法 JSON。"""
 
         project_root = Path(__file__).resolve().parents[1]
@@ -404,6 +457,55 @@ class StateAndOrchestratorTests(unittest.TestCase):
         self.assertTrue(output["continue"])
         self.assertIn(
             "invalid_hook_input",
+            output["systemMessage"],
+        )
+
+    def test_hook_entrypoint_skips_recursive_reviewer_environment(
+        self,
+    ):
+        """验证 Reviewer 子进程继承递归标记后 Hook 立即跳过。"""
+
+        project_root = Path(__file__).resolve().parents[1]
+        script_path = project_root / "hooks" / "task_review.py"
+        hook_payload = json.dumps(
+            {
+                "hook_event_name": "Stop",
+                "session_id": "recursive-session",
+                "turn_id": "recursive-turn",
+                "cwd": str(project_root),
+                "stop_hook_active": False,
+                "last_assistant_message": "reviewing",
+            }
+        )
+        process = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+            ],
+            cwd=project_root,
+            input=hook_payload,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env={
+                **os.environ,
+                "PLUGIN_ROOT": str(project_root),
+                "PLUGIN_DATA": str(project_root / ".test-tmp" / "plugin-data"),
+                "CODEX_TASK_REVIEW_ACTIVE": "1",
+            },
+            check=False,
+        )
+
+        output = json.loads(process.stdout)
+        self.assertEqual(
+            process.returncode,
+            0,
+        )
+        self.assertTrue(
+            output["continue"],
+        )
+        self.assertIn(
+            "recursive_review",
             output["systemMessage"],
         )
 

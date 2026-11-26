@@ -301,32 +301,32 @@ Make Stop return a skip message without invoking Reviewer when `should_review` i
 - `ReviewRunner.run(repo_root: Path, final_tree: str, diff: DiffResult, prompt: str, config: ReviewConfig) -> ReviewResult`.
 - `ReviewResult(status: str, raw_output: str, error: str | None, workspace: Path | None)` is serializable for report generation.
 
-- [ ] **Step 1: Write failing tests for isolated Review behavior**
+- [x] **Step 1: Write failing tests for isolated Review behavior**
 
-Use a fake `codex` executable in a temporary PATH or injectable `subprocess_runner` to assert the command receives `-c sandbox_permissions="read-only"`, `review`, and `-`; cwd is not the user repository; stdin contains the exact Diff; `CODEX_TASK_REVIEW_ACTIVE=1` is present; and the original repository files/Index remain byte-for-byte unchanged. Add timeout, missing executable, nonzero exit, and recursive-environment tests.
+Use an injectable process runner to assert the command receives `--sandbox read-only`, `review`, and `-`; cwd is not the user repository; stdin contains the exact Diff; `CODEX_TASK_REVIEW_ACTIVE=1` is present; and the original repository files/Index remain byte-for-byte unchanged. Add timeout, missing executable, nonzero exit, and recursive-environment tests.
 
-- [ ] **Step 2: Run the Reviewer tests and confirm expected failures**
+- [x] **Step 2: Run the Reviewer tests and confirm expected failures**
 
     py -3 -m unittest tests.test_reviewer -v
 
 Expected: FAIL because `ReviewRunner` and `ReviewResult` are not implemented.
 
-- [ ] **Step 3: Implement temporary FINAL workspace creation**
+- [x] **Step 3: Implement temporary FINAL workspace creation**
 
-Call `GitSnapshotter.export_tree(final_tree, temp_workspace)`, run `git init --initial-branch=main`, set temporary author/committer environment values, `git add -A`, and create one local commit. Never copy or expose the original `.git` directory. Delete the workspace in `finally` unless the test explicitly asks to retain a diagnostic path.
+Call `GitSnapshotter.export_tree(final_tree, temp_workspace)`, run `git init --initial-branch=main`, use command-scoped author identity and an empty isolated Git config, `git add -A`, and create one local commit. Never copy or expose the original `.git` directory. Delete the workspace in `finally` unless the test explicitly asks to retain a diagnostic path.
 
-- [ ] **Step 4: Implement the `codex review -` process**
+- [x] **Step 4: Implement the `codex review -` process**
 
-Build a prompt that states the task description, BASE/FINAL IDs, changed file list, exact Diff, P0–P3 definitions, evidence/line-number requirements, and “read-only report-only; do not edit files”. Run `codex review -` from the temporary workspace with stdin bytes/text, timeout from config, `CODEX_TASK_REVIEW_ACTIVE=1`, and read-only config override. Convert every process failure to `ReviewResult(status="failed", ...)` without raising through Stop.
+Build a prompt that states the task description, BASE/FINAL IDs, changed file list, exact Diff, P0–P3 definitions, evidence/line-number requirements, and “read-only report-only; do not edit files”. Run `codex --sandbox read-only review -` from the temporary workspace with stdin bytes/text, timeout from config, and `CODEX_TASK_REVIEW_ACTIVE=1`. Convert every process failure to `ReviewResult(status="failed", ...)` without raising through Stop.
 
-- [ ] **Step 5: Verify isolation, failure safety, and full tests**
+- [x] **Step 5: Verify isolation, failure safety, and full tests**
 
     py -3 -m unittest tests.test_reviewer -v
     py -3 -m unittest discover -s tests -v
 
 Expected: Review tests pass; no user project mutation is observed.
 
-- [ ] **Step 6: Commit the Reviewer slice**
+- [x] **Step 6: Commit the Reviewer slice**
 
     git add codex_task_review/reviewer.py codex_task_review/orchestrator.py tests/test_reviewer.py
     git commit -m "feat：隔离执行只读 Codex Reviewer"

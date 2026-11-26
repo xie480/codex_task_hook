@@ -12,7 +12,9 @@ from tests.git_helpers import temporary_git_repository
 class GitSnapshotTests(unittest.TestCase):
     """验证临时 Index 只记录任务间工作区变化。"""
 
-    def test_start_dirty_files_are_excluded_from_task_diff(self):
+    def test_start_dirty_files_are_excluded_from_task_diff(
+        self,
+    ):
         """验证任务开始前已有脏文件不会进入任务 Diff。"""
 
         from codex_task_review.git_snapshot import GitRepository
@@ -46,7 +48,9 @@ class GitSnapshotTests(unittest.TestCase):
         self.assertIn("changed during task", diff.patch)
         self.assertNotIn("baseline.txt", diff.patch)
 
-    def test_new_modified_deleted_staged_and_unstaged_files_are_included(self):
+    def test_new_modified_deleted_staged_and_unstaged_files_are_included(
+        self,
+    ):
         """验证暂存、未暂存、新增、修改和删除均写入快照。"""
 
         from codex_task_review.git_snapshot import GitRepository
@@ -132,7 +136,9 @@ class GitSnapshotTests(unittest.TestCase):
         self.assertIn("staged change", diff.patch)
         self.assertIn("unstaged change", diff.patch)
 
-    def test_rename_is_reported_with_similarity_detection(self):
+    def test_rename_is_reported_with_similarity_detection(
+        self,
+    ):
         """验证相同内容的路径移动被识别为重命名。"""
 
         from codex_task_review.git_snapshot import GitRepository
@@ -191,7 +197,9 @@ class GitSnapshotTests(unittest.TestCase):
             "new-name.txt",
         )
 
-    def test_snapshot_does_not_change_real_index(self):
+    def test_snapshot_does_not_change_real_index(
+        self,
+    ):
         """验证快照不会触碰仓库真实 Git Index。"""
 
         from codex_task_review.git_snapshot import GitRepository
@@ -243,7 +251,9 @@ class GitSnapshotTests(unittest.TestCase):
             index_after,
         )
 
-    def test_chinese_and_space_path_is_supported(self):
+    def test_chinese_and_space_path_is_supported(
+        self,
+    ):
         """验证中文与空格文件名可被 Diff 正确读取。"""
 
         from codex_task_review.git_snapshot import GitRepository
@@ -274,7 +284,49 @@ class GitSnapshotTests(unittest.TestCase):
             diff.patch,
         )
 
-    def test_repository_without_head_returns_explicit_error(self):
+    def test_diff_patch_preserves_non_utf8_bytes_for_reviewer_stdin(
+        self,
+    ):
+        """验证补丁文本可无损编码回原始 Git Diff 字节。"""
+
+        from codex_task_review.git_snapshot import GitRepository
+        from codex_task_review.git_snapshot import GitSnapshotter
+
+        with temporary_git_repository() as repo_root:
+            repository = GitRepository.find(repo_root)
+            snapshotter = GitSnapshotter(repository)
+            base = snapshotter.capture()
+            (repo_root / "invalid-utf8.txt").write_bytes(
+                b"invalid byte: \xff\n",
+            )
+            final = snapshotter.capture()
+            diff = snapshotter.diff(
+                base.tree_id,
+                final.tree_id,
+            )
+            raw_diff = repository.run_bytes(
+                [
+                    "diff",
+                    "--binary",
+                    "--no-ext-diff",
+                    "--no-color",
+                    "-M",
+                    base.tree_id,
+                    final.tree_id,
+                ]
+            )
+
+        self.assertEqual(
+            diff.patch.encode(
+                "utf-8",
+                errors="surrogateescape",
+            ),
+            raw_diff,
+        )
+
+    def test_repository_without_head_returns_explicit_error(
+        self,
+    ):
         """验证没有初始提交时快照返回明确错误。"""
 
         from codex_task_review.git_snapshot import GitRepository

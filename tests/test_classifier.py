@@ -55,7 +55,9 @@ def make_diff(
 class ClassifierTests(unittest.TestCase):
     """验证 Review/skip 决策基于 Prompt 和本轮 Diff 证据。"""
 
-    def test_no_changes_never_starts_review(self):
+    def test_no_changes_never_starts_review(
+        self,
+    ):
         """验证空 Diff 无论 Prompt 如何都直接跳过。"""
 
         from codex_task_review.classifier import classify_task
@@ -72,7 +74,9 @@ class ClassifierTests(unittest.TestCase):
             "no_changes",
         )
 
-    def test_force_marker_overrides_bugfix_and_ui_skips(self):
+    def test_force_marker_overrides_bugfix_and_ui_skips(
+        self,
+    ):
         """验证强制标记对简单 Bug 与纯 UI 均触发 Review。"""
 
         from codex_task_review.classifier import classify_task
@@ -103,7 +107,9 @@ class ClassifierTests(unittest.TestCase):
             "forced_review",
         )
 
-    def test_small_explicit_bugfix_within_threshold_is_skipped(self):
+    def test_small_explicit_bugfix_within_threshold_is_skipped(
+        self,
+    ):
         """验证小型明确 Bug 修复在文件和行数阈值内跳过。"""
 
         from codex_task_review.classifier import classify_task
@@ -130,7 +136,9 @@ class ClassifierTests(unittest.TestCase):
             12,
         )
 
-    def test_bugfix_file_and_line_thresholds_force_review(self):
+    def test_bugfix_file_and_line_thresholds_force_review(
+        self,
+    ):
         """验证 Bug 修复超过文件数或总行数阈值时启动 Review。"""
 
         from codex_task_review.classifier import classify_task
@@ -160,7 +168,9 @@ class ClassifierTests(unittest.TestCase):
         self.assertTrue(files_result.should_review)
         self.assertTrue(lines_result.should_review)
 
-    def test_three_files_and_exactly_eighty_changed_lines_can_skip(self):
+    def test_three_files_and_exactly_eighty_changed_lines_can_skip(
+        self,
+    ):
         """验证文件数和行数阈值采用包含边界的判断。"""
 
         from codex_task_review.classifier import classify_task
@@ -188,7 +198,9 @@ class ClassifierTests(unittest.TestCase):
             80,
         )
 
-    def test_complex_bugfix_is_reviewed_even_when_small(self):
+    def test_complex_bugfix_is_reviewed_even_when_small(
+        self,
+    ):
         """验证 Prompt 明确复杂的 Bug 修复不会走简单修复跳过。"""
 
         from codex_task_review.classifier import classify_task
@@ -207,7 +219,9 @@ class ClassifierTests(unittest.TestCase):
             "complex_bugfix",
         )
 
-    def test_pure_stylesheet_and_svg_changes_are_skipped(self):
+    def test_pure_stylesheet_and_svg_changes_are_skipped(
+        self,
+    ):
         """验证样式表和图标资源修改归类为纯视觉 UI。"""
 
         from codex_task_review.classifier import classify_task
@@ -229,7 +243,9 @@ class ClassifierTests(unittest.TestCase):
             "pure_ui",
         )
 
-    def test_static_display_changes_in_tsx_and_vue_are_skipped(self):
+    def test_static_display_changes_in_tsx_and_vue_are_skipped(
+        self,
+    ):
         """验证仅静态文案和展示结构变化可归类为纯 UI。"""
 
         from codex_task_review.classifier import classify_task
@@ -259,7 +275,9 @@ class ClassifierTests(unittest.TestCase):
             "pure_ui",
         )
 
-    def test_ui_diff_with_api_state_validation_or_events_is_reviewed(self):
+    def test_ui_diff_with_api_state_validation_or_events_is_reviewed(
+        self,
+    ):
         """验证 UI 文件中的 API、状态、校验和事件逻辑触发 Review。"""
 
         from codex_task_review.classifier import classify_task
@@ -292,7 +310,9 @@ class ClassifierTests(unittest.TestCase):
                     "ui_logic",
                 )
 
-    def test_high_risk_path_overrides_simple_bugfix_skip(self):
+    def test_high_risk_path_overrides_simple_bugfix_skip(
+        self,
+    ):
         """验证权限、支付和数据库路径优先触发 Review。"""
 
         from codex_task_review.classifier import classify_task
@@ -318,7 +338,9 @@ class ClassifierTests(unittest.TestCase):
                 )
                 self.assertTrue(result.risk_evidence)
 
-    def test_high_risk_prompt_and_diff_keywords_trigger_review(self):
+    def test_high_risk_prompt_and_diff_keywords_trigger_review(
+        self,
+    ):
         """验证 Prompt 或修改代码中的风险关键字触发 Review。"""
 
         from codex_task_review.classifier import classify_task
@@ -343,7 +365,9 @@ class ClassifierTests(unittest.TestCase):
         self.assertTrue(diff_result.should_review)
         self.assertTrue(diff_result.risk_evidence)
 
-    def test_new_features_refactors_and_unknown_changes_are_reviewed(self):
+    def test_new_features_refactors_and_unknown_changes_are_reviewed(
+        self,
+    ):
         """验证新功能、重构和不能确定的变更默认启动 Review。"""
 
         from codex_task_review.classifier import classify_task
@@ -370,7 +394,9 @@ class ClassifierTests(unittest.TestCase):
                     "review_required",
                 )
 
-    def test_disabled_skip_configuration_causes_review(self):
+    def test_disabled_skip_configuration_causes_review(
+        self,
+    ):
         """验证关闭简单 Bug 跳过配置后继续启动 Review。"""
 
         from codex_task_review.classifier import classify_task

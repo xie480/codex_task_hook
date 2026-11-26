@@ -47,14 +47,20 @@ def temporary_git_repository(
         ]
 
         for command in commands:
-            subprocess.run(
+            result = subprocess.run(
                 command,
                 cwd=repo_root,
-                check=True,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
+                check=False,
             )
+
+            if result.returncode != 0:
+                raise RuntimeError(
+                    "临时测试仓库初始化失败: "
+                    f"{' '.join(command)}: {result.stderr.strip()}"
+                )
 
         baseline_file = repo_root / "baseline.txt"
         baseline_file.write_text(

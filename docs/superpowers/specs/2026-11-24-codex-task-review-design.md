@@ -132,7 +132,7 @@ flowchart TD
 - 首次执行时调用 `codex review --help` 的结果已验证 stdin 用法；运行时执行 `codex review -`。
 - Prompt 包含任务描述、严格审查范围、完整 Diff、等级定义、精确行号要求和禁止修改声明。
 - 不在用户仓库中直接运行 Reviewer。先用 `git archive FINAL_TREE` 将最终 Tree 导出到临时目录，在该目录初始化临时 Git 仓库并提交最终快照，然后从原仓库传入 BASE→FINAL 的完整 Diff；这样 Reviewer 即使读取 cwd，也看不到任务开始前遗留的脏文件。
-- Reviewer 工作目录在系统临时目录，执行前设置 `CODEX_TASK_REVIEW_ACTIVE=1`，入口检测该变量后直接返回递归跳过 JSON；子进程通过 `-c sandbox_permissions="read-only"` 请求只读沙箱，且测试验证 Reviewer 失败路径不会修改原仓库。
+- Reviewer 工作目录在系统临时目录，执行前设置 `CODEX_TASK_REVIEW_ACTIVE=1`，入口检测该变量后直接返回递归跳过 JSON；子进程通过 Codex CLI 的 `--sandbox read-only` 参数请求只读沙箱，且测试验证 Reviewer 失败路径不会修改原仓库。
 - Reviewer 失败、超时、命令不存在或 Diff 超过 `max_diff_bytes` 时，Stop Hook 不阻塞主 Agent：写入“未完成审查”的报告并输出失败原因。
 - Reviewer 只能读取上下文，代码修改由插件进程无法触发；测试会验证 Reviewer 失败路径不改动项目文件。
 

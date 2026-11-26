@@ -14,6 +14,7 @@ from .git_snapshot import GitSnapshotter
 from .hook_io import HookInput
 from .hook_io import HookOutput
 from .models import TaskState
+from .reviewer import ReviewRunner
 from .state import TaskStateStore
 
 
@@ -23,14 +24,21 @@ class TaskOrchestrator:
     def __init__(
         self,
         data_root: Path,
+        review_runner: ReviewRunner | None = None,
     ) -> None:
         """初始化插件状态目录。
 
         Args:
             data_root: Codex 提供的 `PLUGIN_DATA` 持久化目录。
+            review_runner: 可选的 Reviewer 执行器，便于离线测试和复用。
         """
 
         self.state_store = TaskStateStore(data_root)
+        self.review_runner = (
+            review_runner
+            if review_runner is not None
+            else ReviewRunner()
+        )
 
     def handle_user_prompt_submit(
         self,
@@ -91,7 +99,7 @@ class TaskOrchestrator:
             hook_input: 已校验的 Stop Hook 输入。
 
         Returns:
-            缺少状态、Hook 重入、无变化或待分类任务的安全输出。
+            跳过、完成 Review 或失败降级时的安全 Hook 输出。
         """
 
         if hook_input.stop_hook_active:
@@ -159,12 +167,13 @@ class TaskOrchestrator:
                 "本轮没有代码变化，无需启动 Review",
             )
 
+        config = ReviewConfig.from_repo(
+            repository.root,
+        )
         classification = classify_task(
             task_state.prompt,
             diff_result,
-            ReviewConfig.from_repo(
-                repository.root,
-            ),
+            config,
         )
 
         if not classification.should_review:
@@ -177,14 +186,42 @@ class TaskOrchestrator:
                 classification.reason,
             )
 
+        review_result = self.review_runner.run(
+            repository.root,
+            final_snapshot.tree_id,
+            diff_result,
+            task_state.prompt,
+            config,
+        )
+        self.state_store.remove(
+            hook_input.identity,
+        )
+
+        if review_result.status == "completed":
+            return HookOutput(
+                "reviewed",
+                "review_completed",
+                (
+                    f"{classification.reason}；已完成只读 Review，"
+                    f"覆盖 {classification.changed_files} 个文件、"
+                    f"{classification.changed_lines} 行变化"
+                ),
+            )
+
+        if review_result.status == "failed":
+            return HookOutput(
+                "review_failed",
+                "review_failed",
+                (
+                    "只读 Review 未完成，主任务继续："
+                    f"{review_result.error or '未知 Reviewer 错误'}"
+                ),
+            )
+
         return HookOutput(
-            "ready",
-            classification.kind,
-            (
-                f"{classification.reason}；本轮 Diff 包含"
-                f"{classification.changed_files} 个文件、"
-                f"{classification.changed_lines} 行变化，待启动 Reviewer"
-            ),
+            "skipped",
+            "review_skipped",
+            review_result.error or "Reviewer 本次未运行",
         )
 
     @staticmethod

@@ -332,7 +332,7 @@ class GitSnapshotter:
             final_tree=final_tree,
             patch=patch_bytes.decode(
                 "utf-8",
-                errors="replace",
+                errors="surrogateescape",
             ),
             files=files,
             additions=additions,

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import shutil
+import stat
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Callable
 from typing import Iterator
 
 
@@ -43,5 +45,32 @@ def temporary_workspace(
     finally:
         shutil.rmtree(
             directory,
-            ignore_errors=True,
+            onerror=_retry_read_only_cleanup,
         )
+
+
+def _retry_read_only_cleanup(
+    function: Callable[[str], None],
+    path: str,
+    error: tuple[type[OSError], OSError, object],
+) -> None:
+    """清除 Git 临时仓库只读文件属性后重试回收测试目录。
+
+    Args:
+        function: `shutil.rmtree` 原本要执行的删除函数。
+        path: 当前无法删除的测试临时文件或目录。
+        error: 原始删除错误元组，仅用于满足 `onerror` 回调契约。
+
+    Returns:
+        无；权限允许时重试删除，仍失败则静默返回。
+    """
+
+    del error
+
+    try:
+        Path(path).chmod(
+            stat.S_IWRITE,
+        )
+        function(path)
+    except OSError:
+        pass
