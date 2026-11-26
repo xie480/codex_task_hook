@@ -511,14 +511,16 @@ Expected: all tests pass, all JSON commands exit 0, no whitespace errors, and on
 
 Expected: no prohibited implementation matches; the only allowed `YOUR_GITHUB_USERNAME` placeholder remains in metadata/docs.
 
-- [ ] **Step 5: Commit final verification and documentation corrections**
+- [x] **Step 5: Commit final verification and documentation corrections**
 
     git add .github/workflows/tests.yml tests/test_integration.py docs/superpowers/plans/2026-11-24-codex-task-review.md
     git commit -m "test: 补充跨平台 Hook 集成验证与 CI"
 
-- [ ] **Step 6: Report real evidence and known limits**
+- [x] **Step 6: Record verification evidence and known limits**
 
-Report local commit list, exact test command/output summary, plugin files, documentation path, and unverified production behavior such as a real installed plugin trust flow, live GitHub fetch, and a live remote Reviewer call if those were not executed.
+Verification on Windows: `py -3 -m unittest discover -s tests -v` passed all 55 tests; `py -3 -m compileall -q codex_task_review hooks tests` passed; all four plugin JSON files and the SVG parsed; the workflow YAML parsed and its Windows/Linux plus Python 3.10/3.14 matrix was checked; prohibited-pattern scan and staged whitespace check found no issues. The Task 9 implementation commit is `4a39563` (`test: 补充跨平台 Hook 集成验证与 CI`).
+
+Not exercised: GitHub-hosted Linux/Windows CI execution, live GitHub Marketplace fetch, real Codex plugin installation and Hook trust flow, and a live remote Codex Reviewer call. The CI workflow is committed but will run after the repository is pushed to GitHub.
 
 ## Plan self-review
 
