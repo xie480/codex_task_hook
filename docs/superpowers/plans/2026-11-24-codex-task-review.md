@@ -483,19 +483,20 @@ Explain that lifecycle hooks are suited to GitHub-backed/manual Codex installati
 - The public verification command is `py -3 -m unittest discover -s tests -v`.
 - The project does not add a test-only dependency or require the user’s real repository.
 
-- [ ] **Step 1: Write failing end-to-end tests for the complete Hook flow**
+- [x] **Step 1: Add end-to-end tests for the complete Hook flow**
 
-In a temporary Git repository with a pre-existing dirty file, invoke `hooks/task_review.py` twice with different identities, mutate staged/unstaged files, stop one task, and assert only that task’s Diff appears in the generated report. Assert the report is written after the FINAL snapshot and Diff so it cannot enter that same task’s Diff, and that the user Git Index remains unchanged. Add a fake Reviewer so the suite is offline and deterministic.
+In a temporary Git repository with a pre-existing dirty file, invoke `hooks/task_review.py` twice with different identities, mutate staged/unstaged files, stop each task, and assert only that task’s Diff appears in the generated report. Assert the report is written after the FINAL snapshot and Diff so it cannot enter that same task’s Diff, and that the user Git Index remains unchanged. Add a fake Reviewer so the suite is offline and deterministic.
 
-- [ ] **Step 2: Run the integration tests and fix only product defects**
+- [x] **Step 2: Run the integration tests and fix only product defects**
 
     py -3 -m unittest tests.test_integration -v
 
-Expected: initially failing integration assertions identify missing wiring; do not weaken assertions or remove valid scenarios.
+The existing Hook implementation already contained the full lifecycle wiring, so the new real-process integration test passed without production changes. The test uses a temporary Git repository and a local fake Reviewer; it verifies pre-existing dirty-file exclusion, one staged and one unstaged turn change, per-turn report scope, report timing, and unchanged Git Index bytes after each Stop.
 
-- [ ] **Step 3: Run the complete verification set**
+- [x] **Step 3: Run the complete verification set**
 
     py -3 -m unittest discover -s tests -v
+    py -3 -m compileall -q codex_task_review hooks tests
     git diff --check
     python -m json.tool .codex-plugin/plugin.json > $null
     python -m json.tool hooks/hooks.json > $null
@@ -504,7 +505,7 @@ Expected: initially failing integration assertions identify missing wiring; do n
 
 Expected: all tests pass, all JSON commands exit 0, no whitespace errors, and only intentional local changes are present.
 
-- [ ] **Step 4: Inspect the final diff for prohibited behavior**
+- [x] **Step 4: Inspect the final diff for prohibited behavior**
 
     git grep -n -E "git (reset|checkout|clean)|git diff (HEAD|main|origin/main)|C:\\Users\\|OPENAI_API_KEY|decision\\\"\\s*:\\s*\\\"block" -- . ':(exclude).git'
 
@@ -512,8 +513,8 @@ Expected: no prohibited implementation matches; the only allowed `YOUR_GITHUB_US
 
 - [ ] **Step 5: Commit final verification and documentation corrections**
 
-    git add tests README.md
-    git commit -m "test：完成 Windows 集成验证与发布检查"
+    git add .github/workflows/tests.yml tests/test_integration.py docs/superpowers/plans/2026-11-24-codex-task-review.md
+    git commit -m "test: 补充跨平台 Hook 集成验证与 CI"
 
 - [ ] **Step 6: Report real evidence and known limits**
 
