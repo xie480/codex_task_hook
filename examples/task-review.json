@@ -1,0 +1,10 @@
+{
+  "skip_simple_bugfix": true,
+  "skip_pure_ui": true,
+  "max_bugfix_files": 3,
+  "max_bugfix_changed_lines": 80,
+  "force_review_marker": "[review:force]",
+  "report_directory": ".codex/reviews",
+  "review_timeout": 600,
+  "max_diff_bytes": 1048576
+}

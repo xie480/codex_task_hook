@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/task_review.py\"",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}\\hooks\\task_review.py\"",
+            "timeout": 30,
+            "statusMessage": "正在记录任务代码快照"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/task_review.py\"",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}\\hooks\\task_review.py\"",
+            "timeout": 600,
+            "statusMessage": "正在进行只读代码审查"
+          }
+        ]
+      }
+    ]
+  }
+}

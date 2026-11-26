@@ -1,0 +1,21 @@
+{
+  "name": "codex-task-review-marketplace",
+  "interface": {
+    "displayName": "Codex Task Review"
+  },
+  "plugins": [
+    {
+      "name": "codex-task-review",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/YOUR_GITHUB_USERNAME/codex-task-review.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

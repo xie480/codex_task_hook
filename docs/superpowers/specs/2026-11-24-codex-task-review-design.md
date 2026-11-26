@@ -26,25 +26,26 @@
 
 - 本机 Codex CLI 版本为 `0.172.0`。
 - `codex review --help` 已确认支持 `codex review -`，可从 stdin 读取自定义审查指令；本项目优先使用该命令。
-- 当前 OpenAI 插件文档推荐根目录 portable `plugin.json`，并支持在 `extensions.com.openai.hooks` 中声明 `./hooks/hooks.json`；`.codex-plugin/plugin.json` 仍作为兼容回退。
-- Codex 默认加载插件根目录的 `hooks/hooks.json`，Hook 命令接收 `PLUGIN_ROOT` 与 `PLUGIN_DATA`。
+- 当前 OpenAI 插件文档推荐根目录 portable `plugin.json`，并支持 `extensions.com.openai.hooks`；但当前 Codex 源码的插件加载器会对 `AgentPlugin` 格式返回空 Hook 列表。相关依据：[插件打包文档](https://developers.openai.com/plugins/build/plugins)、[Codex 插件加载器](https://github.com/openai/codex/blob/main/codex-rs/core-plugins/src/loader.rs#L3853-L3873)。
+- 为让 Codex 优先读取 `.codex-plugin/plugin.json` 并加载插件 Hooks，本项目采用独立 Codex 兼容清单，不包含根目录 portable `plugin.json`。Codex 兼容格式支持 `hooks` 字段、`PLUGIN_ROOT` 与 `PLUGIN_DATA`；详见 [插件 Hook 指南](https://developers.openai.com/codex/hooks)。该格式不提供 Agent Plugins 主机的 portable manifest 入口。
+- 插件 Hook 在用户检查并信任当前 Hook 定义之前不会运行；含生命周期 Hook 的包不符合 OpenAI 公共插件目录的提交资格。GitHub Marketplace 安装和手动 Codex 分发仍作为本项目发布路线。
 - Hook 输出遵循 Codex 的通用 JSON 字段：`continue`、`stopReason`、`suppressOutput`、`systemMessage`；本项目不返回 `decision:block`，任何失败都允许主 Agent 正常结束。
 - 根目录 Marketplace 文件为 `.agents/plugins/marketplace.json`；插件位于当前 GitHub 仓库根目录，因此使用 `source: "url"`，仓库地址保留 `YOUR_GITHUB_USERNAME` 占位符。
 
 ## 方案对比与选型
 
-### 方案 A：portable manifest + legacy 兼容回退（已选）
+### 方案 A：portable manifest + legacy 兼容回退（已放弃）
 
 - 根目录 `plugin.json` 是当前官方推荐的 portable 入口。
 - `.codex-plugin/plugin.json` 提供旧版 Codex 兼容入口；两份 manifest 共用根目录 Hook 和脚本。
 - `hooks/hooks.json` 注册 `UserPromptSubmit` 和 `Stop`，同时提供 `command` 与 `commandWindows`；Windows 优先执行 `py -3 "${PLUGIN_ROOT}/hooks/task_review.py"`，找不到 `py` 时由入口输出可读错误并安全放行。
 - `.agents/plugins/marketplace.json` 使用 GitHub 根仓库 URL，安装命令保持官方 `codex plugin marketplace add` / `codex plugin add` 流程。
 
-选择原因：同时满足任务对根目录文件的明确要求和当前 Codex 的兼容加载路径，不增加运行时依赖，也不会污染用户全局 Hook。
+初选原因：同时保留 portable 包身份和 Codex 兼容入口，不增加运行时依赖。
 
-### 方案 B：仅 legacy Codex 结构
+### 方案 B：仅 Codex 兼容结构（当前选择）
 
-只维护 `.codex-plugin/plugin.json` 与兼容 Hook。实现量较小，但不符合当前 portable manifest 规范，也无法直接覆盖其他 Agent Plugins 主机，因此放弃。
+只维护 `.codex-plugin/plugin.json` 与兼容 Hook。该方案牺牲 portable Agent Plugins 入口，但当前 Codex 文档说明 Codex 格式支持插件 Hooks，且当前 Codex 源码未从 Agent Plugins 格式加载插件 Hooks。用户于 2026-11-26 选择优先确保 Codex Hook 可运行；若上游加载器行为改变，再评估恢复 portable manifest。
 
 ### 方案 C：仓库内 `plugins/codex-task-review` 子目录
 
@@ -183,7 +184,7 @@ flowchart TD
 
 ## 交付清单
 
-- 根目录 `plugin.json` 与 `.codex-plugin/plugin.json`。
+- `.codex-plugin/plugin.json`、`hooks/hooks.json` 与根目录 Marketplace/示例/README。
 - `hooks/hooks.json`、`hooks/task_review.py` 与 Python 业务模块。
 - `.agents/plugins/marketplace.json`，GitHub 用户名使用占位符。
 - 中文 README、配置示例、审查报告示例、MIT LICENSE、`.gitignore`。

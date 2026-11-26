@@ -4,7 +4,7 @@
 
 **Goal:** Build a standalone, Windows-compatible Codex Plugin that captures task-scoped Git snapshots, classifies the exact task Diff, runs a read-only `codex review -` only when required, and writes Markdown reports without modifying user code.
 
-**Architecture:** Use a portable root `plugin.json` with a `.codex-plugin/plugin.json` compatibility overlay. Hook entrypoint `hooks/task_review.py` loads a focused `codex_task_review` standard-library package. A temporary Git index creates BASE and FINAL trees; Stop exports FINAL to an isolated temporary review repository and passes only BASE→FINAL Diff through stdin to `codex review -`.
+**Architecture:** Use `.codex-plugin/plugin.json` as the Codex compatibility manifest so the current Codex loader attaches plugin-bundled Hooks. Hook entrypoint `hooks/task_review.py` loads a focused `codex_task_review` standard-library package. A temporary Git index creates BASE and FINAL trees; Stop exports FINAL to an isolated temporary review repository and passes only BASE→FINAL Diff through stdin to `codex review -`.
 
 **Tech Stack:** Python 3 standard library, Git for Windows, Codex CLI `codex review -`, JSON, Markdown, Python `unittest`.
 
@@ -390,33 +390,33 @@ The writer uses an exclusive same-directory hard-link creation from a fully flus
 ### Task 8: Add official plugin manifests, Hooks, Marketplace, examples, and README
 
 **Files:**
-- Create: `plugin.json`
 - Create: `.codex-plugin/plugin.json`
 - Create: `hooks/hooks.json`
 - Create: `.agents/plugins/marketplace.json`
 - Create: `examples/task-review.json`
 - Create: `examples/code-review-example.md`
+- Create: `assets/codex-task-review.svg`
 - Create: `README.md`
 
 **Interfaces:**
-- Manifest hooks point to `./hooks/hooks.json`; both manifests use plugin name `codex-task-review` and version `0.1.0`.
-- Marketplace name is `codex-task-review-marketplace`; source URL is `https://github.com/YOUR_GITHUB_USERNAME/codex-task-review.git`, with `ref: "main"`.
+- The Codex compatibility manifest uses plugin name `codex-task-review` and version `0.1.0`; omit a root portable manifest because the current Codex loader skips bundled hooks for Agent Plugins format.
+- Marketplace name is `codex-task-review-marketplace`; its Git-backed root source URL is `https://github.com/YOUR_GITHUB_USERNAME/codex-task-review.git`, with `ref: "main"`.
 
 - [ ] **Step 1: Write failing manifest and documentation validation tests**
 
-Add `tests/test_package_layout.py` that loads JSON and asserts root/legacy manifest identity, hook path, both Hook events, `commandWindows` containing `py -3`, Marketplace name/version/source URL placeholder, no hard-coded `C:\Users\` path, README installation/update/uninstall commands, and example report headings.
+Add `tests/test_package_layout.py` that loads JSON and asserts the Codex compatibility manifest identity and hook path, absence of the root portable manifest, both Hook events, `commandWindows` containing `py -3`, Marketplace name/version/source URL placeholder, no hard-coded `C:\Users\` path, README installation/update/uninstall commands, and example report headings.
 
 - [ ] **Step 2: Run package layout tests and confirm expected failures**
 
     py -3 -m unittest tests.test_package_layout -v
 
-Expected: FAIL because packaging files do not exist.
+Expected: the four packaging checks error because the required manifest, Hook, Marketplace, example, and README files do not exist.
 
-- [ ] **Step 3: Implement portable and compatibility manifests**
+- [x] **Step 3: Implement the Codex compatibility manifest**
 
-Root `plugin.json` uses the Agent Plugins schema and `extensions.com.openai.hooks: "./hooks/hooks.json"`, with interface metadata and `YOUR_GITHUB_USERNAME` repository/homepage placeholders. `.codex-plugin/plugin.json` mirrors the compatibility fields and hooks path. Do not include secrets or fake publisher identity.
+Use `.codex-plugin/plugin.json` as the primary Codex manifest and declare `hooks: "./hooks/hooks.json"` there. Do not add root `plugin.json`: current Codex source selects the Agent Plugins format from that root manifest and skips bundled Hook loading for that format. Do not include secrets or fake publisher identity.
 
-- [ ] **Step 4: Register Windows-safe Hooks**
+- [x] **Step 4: Register Windows-safe Hooks**
 
 Use this shape in `hooks/hooks.json`:
 
@@ -427,7 +427,7 @@ Use this shape in `hooks/hooks.json`:
             "hooks": [
               {
                 "type": "command",
-                "command": "python3 ${PLUGIN_ROOT}/hooks/task_review.py",
+                "command": "python3 \\\"${PLUGIN_ROOT}/hooks/task_review.py\\\"",
                 "commandWindows": "py -3 \"${PLUGIN_ROOT}\\hooks\\task_review.py\"",
                 "timeout": 30,
                 "statusMessage": "Capturing task review snapshot"
@@ -440,7 +440,7 @@ Use this shape in `hooks/hooks.json`:
             "hooks": [
               {
                 "type": "command",
-                "command": "python3 ${PLUGIN_ROOT}/hooks/task_review.py",
+                "command": "python3 \\\"${PLUGIN_ROOT}/hooks/task_review.py\\\"",
                 "commandWindows": "py -3 \"${PLUGIN_ROOT}\\hooks\\task_review.py\"",
                 "timeout": 600,
                 "statusMessage": "Reviewing task changes"
@@ -453,9 +453,9 @@ Use this shape in `hooks/hooks.json`:
 
 The entrypoint reads `PLUGIN_DATA` and `PLUGIN_ROOT` from the process environment; no user path is embedded.
 
-- [ ] **Step 5: Add Marketplace, config example, report example, and Chinese README**
+- [x] **Step 5: Add Marketplace, config example, report example, icon, and Chinese README**
 
-README must contain project introduction, workflow, requirements, structure, installation, update, uninstall, configuration, skip rules, report example, FAQ, Windows troubleshooting, GitHub publishing commands, and these copyable commands:
+README must contain project introduction, workflow, requirements, structure, installation, update, uninstall, configuration, skip rules, report example, FAQ, Windows troubleshooting, GitHub publishing commands, compatibility-manifest rationale, and these copyable commands:
 
     codex plugin marketplace add YOUR_GITHUB_USERNAME/codex-task-review --ref main
     codex plugin add codex-task-review@codex-task-review-marketplace
@@ -466,16 +466,17 @@ README must contain project introduction, workflow, requirements, structure, ins
 
 Explain that lifecycle hooks are suited to GitHub-backed/manual Codex installation and require user trust; do not claim automatic public directory eligibility.
 
-- [ ] **Step 6: Run package tests and commit packaging**
+- [x] **Step 6: Run package tests and commit packaging**
 
     py -3 -m unittest tests.test_package_layout -v
-    git add plugin.json .codex-plugin hooks/hooks.json .agents/plugins/marketplace.json examples README.md
-    git commit -m "feat：补齐 Codex 插件与 Marketplace 打包"
+    git add .codex-plugin hooks/hooks.json .agents/plugins/marketplace.json examples assets README.md tests/test_package_layout.py docs/superpowers/specs/2026-11-24-codex-task-review-design.md docs/superpowers/plans/2026-11-24-codex-task-review.md
+    git commit -m "feat: 完成 Codex 插件与 Marketplace 打包"
 
 ### Task 9: Complete Windows-oriented integration coverage and release verification
 
 **Files:**
 - Create: `tests/test_integration.py`
+- Create: `.github/workflows/tests.yml`
 - Modify: `README.md` only for observed command/output corrections
 
 **Interfaces:**
@@ -484,7 +485,7 @@ Explain that lifecycle hooks are suited to GitHub-backed/manual Codex installati
 
 - [ ] **Step 1: Write failing end-to-end tests for the complete Hook flow**
 
-In a temporary Git repository with a pre-existing dirty file, invoke `hooks/task_review.py` twice with different identities, mutate staged/unstaged files, stop one task, and assert only that task’s Diff appears in the generated report. Assert report files are ignored and not part of the Diff. Add fake Reviewer and fake Codex executables so the suite is offline and deterministic.
+In a temporary Git repository with a pre-existing dirty file, invoke `hooks/task_review.py` twice with different identities, mutate staged/unstaged files, stop one task, and assert only that task’s Diff appears in the generated report. Assert the report is written after the FINAL snapshot and Diff so it cannot enter that same task’s Diff, and that the user Git Index remains unchanged. Add a fake Reviewer so the suite is offline and deterministic.
 
 - [ ] **Step 2: Run the integration tests and fix only product defects**
 
@@ -496,7 +497,6 @@ Expected: initially failing integration assertions identify missing wiring; do n
 
     py -3 -m unittest discover -s tests -v
     git diff --check
-    python -m json.tool plugin.json > $null
     python -m json.tool .codex-plugin/plugin.json > $null
     python -m json.tool hooks/hooks.json > $null
     python -m json.tool .agents/plugins/marketplace.json > $null
