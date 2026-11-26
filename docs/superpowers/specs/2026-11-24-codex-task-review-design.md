@@ -30,7 +30,7 @@
 - 为让 Codex 优先读取 `.codex-plugin/plugin.json` 并加载插件 Hooks，本项目采用独立 Codex 兼容清单，不包含根目录 portable `plugin.json`。Codex 兼容格式支持 `hooks` 字段、`PLUGIN_ROOT` 与 `PLUGIN_DATA`；详见 [插件 Hook 指南](https://developers.openai.com/codex/hooks)。该格式不提供 Agent Plugins 主机的 portable manifest 入口。
 - 插件 Hook 在用户检查并信任当前 Hook 定义之前不会运行；含生命周期 Hook 的包不符合 OpenAI 公共插件目录的提交资格。GitHub Marketplace 安装和手动 Codex 分发仍作为本项目发布路线。
 - Hook 输出遵循 Codex 的通用 JSON 字段：`continue`、`stopReason`、`suppressOutput`、`systemMessage`；本项目不返回 `decision:block`，任何失败都允许主 Agent 正常结束。
-- 根目录 Marketplace 文件为 `.agents/plugins/marketplace.json`；插件位于当前 GitHub 仓库根目录，因此使用 `source: "url"`，仓库地址保留 `YOUR_GITHUB_USERNAME` 占位符。
+- 根目录 Marketplace 文件为 `.agents/plugins/marketplace.json`；插件位于当前 GitHub 仓库根目录，因此使用 `source: "url"`，仓库地址为 `https://github.com/xie480/codex_task_hook.git`。
 
 ## 方案对比与选型
 

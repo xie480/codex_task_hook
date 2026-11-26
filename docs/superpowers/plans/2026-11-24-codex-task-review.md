@@ -400,7 +400,7 @@ The writer uses an exclusive same-directory hard-link creation from a fully flus
 
 **Interfaces:**
 - The Codex compatibility manifest uses plugin name `codex-task-review` and version `0.1.0`; omit a root portable manifest because the current Codex loader skips bundled hooks for Agent Plugins format.
-- Marketplace name is `codex-task-review-marketplace`; its Git-backed root source URL is `https://github.com/YOUR_GITHUB_USERNAME/codex-task-review.git`, with `ref: "main"`.
+- Marketplace name is `codex-task-review-marketplace`; its Git-backed root source URL is `https://github.com/xie480/codex_task_hook.git`, with `ref: "main"`.
 
 - [ ] **Step 1: Write failing manifest and documentation validation tests**
 
@@ -457,11 +457,10 @@ The entrypoint reads `PLUGIN_DATA` and `PLUGIN_ROOT` from the process environmen
 
 README must contain project introduction, workflow, requirements, structure, installation, update, uninstall, configuration, skip rules, report example, FAQ, Windows troubleshooting, GitHub publishing commands, compatibility-manifest rationale, and these copyable commands:
 
-    codex plugin marketplace add YOUR_GITHUB_USERNAME/codex-task-review --ref main
+    codex plugin marketplace add https://github.com/xie480/codex_task_hook --ref main
     codex plugin add codex-task-review@codex-task-review-marketplace
     codex plugin marketplace upgrade codex-task-review-marketplace
-    git remote add origin https://github.com/YOUR_GITHUB_USERNAME/codex-task-review.git
-    git branch -M main
+    git remote set-url origin https://github.com/xie480/codex_task_hook.git
     git push -u origin main
 
 Explain that lifecycle hooks are suited to GitHub-backed/manual Codex installation and require user trust; do not claim automatic public directory eligibility.
@@ -509,7 +508,7 @@ Expected: all tests pass, all JSON commands exit 0, no whitespace errors, and on
 
     git grep -n -E "git (reset|checkout|clean)|git diff (HEAD|main|origin/main)|C:\\Users\\|OPENAI_API_KEY|decision\\\"\\s*:\\s*\\\"block" -- . ':(exclude).git'
 
-Expected: no prohibited implementation matches; the only allowed `YOUR_GITHUB_USERNAME` placeholder remains in metadata/docs.
+Expected: no prohibited implementation matches or unresolved publisher placeholders remain.
 
 - [x] **Step 5: Commit final verification and documentation corrections**
 
@@ -525,5 +524,5 @@ Not exercised: GitHub-hosted Linux/Windows CI execution, live GitHub Marketplace
 ## Plan self-review
 
 - Spec coverage: Tasks 2–4 cover Hook contracts, state isolation, no-HEAD/error handling, and exact temporary-index Diff; Task 5 covers every classification branch; Tasks 6–7 cover isolated Review, report format, recursion, timeout, and report timing; Task 8 covers plugin, hooks, Marketplace, configuration, README, and examples; Task 9 covers all listed integration behaviors.
-- Placeholder scan: `YOUR_GITHUB_USERNAME` is an intentional user-facing publishing placeholder required by the spec; no implementation step is left as TODO/TBD.
+- Publisher identity and repository URLs are filled with the verified GitHub account and repository; no implementation step is left as TODO/TBD.
 - Type consistency: `DiffResult`, `ClassificationResult`, `ReviewResult`, `TaskState`, `HookInput`, and `ReviewConfig` are defined in Task 2 and consumed by later tasks with the same names and fields.

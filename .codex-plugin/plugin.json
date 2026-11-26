@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "description": "Capture task-scoped Git changes and run a read-only Codex review with a Markdown report.",
   "author": {
-    "name": "YOUR_NAME",
-    "url": "https://github.com/YOUR_GITHUB_USERNAME"
+    "name": "Yilena",
+    "url": "https://github.com/xie480"
   },
-  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/codex-task-review",
-  "repository": "https://github.com/YOUR_GITHUB_USERNAME/codex-task-review",
+  "homepage": "https://github.com/xie480/codex_task_hook",
+  "repository": "https://github.com/xie480/codex_task_hook",
   "license": "MIT",
   "keywords": [
     "codex",
@@ -20,13 +20,13 @@
     "displayName": "Codex Task Review",
     "shortDescription": "只读审查本轮 Git 变更",
     "longDescription": "在 Codex 任务开始和结束时记录当前仓库的临时 Git 快照，只比较本轮任务产生的变更。按确定性规则跳过小型 Bug 修复和纯视觉 UI 修改；对新功能、逻辑变化和高风险路径运行只读 Codex Reviewer，并在仓库内生成中文 Markdown 报告。插件不修改用户文件、不写入真实 Git Index，也不会阻止主任务继续。",
-    "developerName": "YOUR_NAME",
+    "developerName": "Yilena",
     "category": "Developer Tools",
     "capabilities": [
       "Read-only code review",
       "Git change analysis"
     ],
-    "websiteURL": "https://github.com/YOUR_GITHUB_USERNAME/codex-task-review",
+    "websiteURL": "https://github.com/xie480/codex_task_hook",
     "defaultPrompt": [
       "Review the code changes from my current task."
     ],

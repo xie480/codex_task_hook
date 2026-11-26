@@ -6,7 +6,7 @@ Codex Task Review 是一个独立的 Codex 插件。它在任务开始时保存�
 
 插件不会修改用户文件或真实 Git Index，不会自动暂存、提交或阻止主任务继续。
 
-> 插件包含 Codex 生命周期 Hooks，通过 GitHub Marketplace 或本地仓库安装。用户必须在 Codex 中检查并信任 Hooks 后，它们才会运行。含生命周期 Hooks 的插件不能提交到 OpenAI 公共插件目录。
+> 插件通过 GitHub Marketplace 或本地仓库安装，包含 Codex 生命周期 Hooks。用户必须在 Codex 中检查并信任 Hooks 后，它们才会运行。含生命周期 Hooks 的插件目前不能提交到 OpenAI 公共插件目录。
 
 ## 工作流程
 
@@ -52,13 +52,15 @@ Codex Task Review 是一个独立的 Codex 插件。它在任务开始时保存�
 
 ## 安装
 
-先把 Marketplace 文件与插件清单中的 `YOUR_GITHUB_USERNAME`、`YOUR_NAME` 替换成你的 GitHub 用户名和发布者名称，再发布仓库。
+从 GitHub 添加 Marketplace 并安装插件：
 
 ```powershell
-codex plugin marketplace add YOUR_GITHUB_USERNAME/codex-task-review --ref main
+codex plugin marketplace add https://github.com/xie480/codex_task_hook --ref main
 codex plugin add codex-task-review@codex-task-review-marketplace
 codex plugin list
 ```
+
+仓库内 Marketplace 清单已指向本项目根目录插件源：`https://github.com/xie480/codex_task_hook.git`。
 
 CLI 安装只注册并安装插件，不会绕过 Hook 信任流程。回到 Codex 后打开 `/hooks`，检查 `UserPromptSubmit` 和 `Stop` 两个命令及其插件路径，再信任这组 Hook。
 
@@ -179,17 +181,16 @@ py -3 -m compileall -q codex_task_review hooks tests
 
 ## GitHub 发布
 
-此项目可以作为公开 GitHub 仓库供 Codex CLI Marketplace 安装。它含有生命周期 Hooks，因此不要把当前包描述成已发布或符合 OpenAI 公共插件目录资格。
+本项目已发布在公开 GitHub 仓库中，可供 Codex CLI Marketplace 安装。由于插件包含生命周期 Hooks，它不符合 OpenAI 公共插件目录的提交资格。
 
-首次推送前，将所有 `YOUR_GITHUB_USERNAME` 和 `YOUR_NAME` 占位符替换为真实发布信息。已有 GitHub 空仓库后，在当前仓库执行：
+本项目仓库地址为 [xie480/codex_task_hook](https://github.com/xie480/codex_task_hook)。如果本地已有克隆仓库，可用以下命令设置远程地址并推送后续提交：
 
 ```powershell
-git remote add origin https://github.com/YOUR_GITHUB_USERNAME/codex-task-review.git
-git branch -M main
+git remote set-url origin https://github.com/xie480/codex_task_hook.git
 git push -u origin main
 ```
 
-然后按“安装”章节的命令添加 Marketplace 并安装插件。公开 GitHub 仓库不等于 OpenAI 公共插件目录发布；后者有单独的提交和审核流程，且当前生命周期 Hook 插件不符合该目录的提交条件。
+然后按“安装”章节添加 Marketplace 并安装插件。公开 GitHub 仓库不等于 OpenAI 公共插件目录发布；后者有单独的提交和审核流程，且当前生命周期 Hook 插件不符合该目录的提交条件。
 
 ## 许可证
 

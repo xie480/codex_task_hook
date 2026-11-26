@@ -61,7 +61,19 @@ class PackageLayoutTests(unittest.TestCase):
         )
         self.assertEqual(
             manifest["author"]["name"],
-            "YOUR_NAME",
+            "Yilena",
+        )
+        self.assertEqual(
+            manifest["author"]["url"],
+            "https://github.com/xie480",
+        )
+        self.assertEqual(
+            manifest["homepage"],
+            "https://github.com/xie480/codex_task_hook",
+        )
+        self.assertEqual(
+            manifest["repository"],
+            "https://github.com/xie480/codex_task_hook",
         )
 
         interface = manifest["interface"]
@@ -77,6 +89,14 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertEqual(
             interface["logo"],
             "./assets/codex-task-review.svg",
+        )
+        self.assertEqual(
+            interface["developerName"],
+            "Yilena",
+        )
+        self.assertEqual(
+            interface["websiteURL"],
+            "https://github.com/xie480/codex_task_hook",
         )
         self.assertFalse(
             (PROJECT_ROOT / "plugin.json").exists(),
@@ -148,7 +168,7 @@ class PackageLayoutTests(unittest.TestCase):
         )
         self.assertEqual(
             source["url"],
-            "https://github.com/YOUR_GITHUB_USERNAME/codex-task-review.git",
+            "https://github.com/xie480/codex_task_hook.git",
         )
         self.assertEqual(
             source["ref"],
@@ -209,10 +229,12 @@ class PackageLayoutTests(unittest.TestCase):
                 )
 
         for command in (
-            "codex plugin marketplace add YOUR_GITHUB_USERNAME/codex-task-review --ref main",
+            "codex plugin marketplace add https://github.com/xie480/codex_task_hook --ref main",
             "codex plugin add codex-task-review@codex-task-review-marketplace",
             "codex plugin marketplace upgrade codex-task-review-marketplace",
             "codex plugin remove codex-task-review@codex-task-review-marketplace",
+            "codex plugin marketplace remove codex-task-review-marketplace",
+            "git remote set-url origin https://github.com/xie480/codex_task_hook.git",
             "git push -u origin main",
         ):
             with self.subTest(command=command):
@@ -220,6 +242,11 @@ class PackageLayoutTests(unittest.TestCase):
                     command,
                     readme,
                 )
+
+        self.assertNotRegex(
+            readme,
+            r"YOUR_[A-Z_]+",
+        )
 
         for section in (
             "工作流程",
