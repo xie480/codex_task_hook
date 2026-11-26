@@ -14,6 +14,8 @@ from .git_snapshot import GitSnapshotter
 from .hook_io import HookInput
 from .hook_io import HookOutput
 from .models import TaskState
+from .report import ReportWriteError
+from .report import ReviewReportWriter
 from .reviewer import ReviewRunner
 from .state import TaskStateStore
 
@@ -25,12 +27,14 @@ class TaskOrchestrator:
         self,
         data_root: Path,
         review_runner: ReviewRunner | None = None,
+        report_writer: ReviewReportWriter | None = None,
     ) -> None:
         """初始化插件状态目录。
 
         Args:
             data_root: Codex 提供的 `PLUGIN_DATA` 持久化目录。
             review_runner: 可选的 Reviewer 执行器，便于离线测试和复用。
+            report_writer: 可选的报告写入器，便于离线测试和复用。
         """
 
         self.state_store = TaskStateStore(data_root)
@@ -38,6 +42,11 @@ class TaskOrchestrator:
             review_runner
             if review_runner is not None
             else ReviewRunner()
+        )
+        self.report_writer = (
+            report_writer
+            if report_writer is not None
+            else ReviewReportWriter()
         )
 
     def handle_user_prompt_submit(
@@ -193,6 +202,39 @@ class TaskOrchestrator:
             task_state.prompt,
             config,
         )
+
+        if review_result.status not in {
+            "completed",
+            "failed",
+        }:
+            self.state_store.remove(
+                hook_input.identity,
+            )
+            return HookOutput(
+                "skipped",
+                "review_skipped",
+                review_result.error or "Reviewer 本次未运行",
+            )
+
+        try:
+            report_path = self.report_writer.write(
+                repository.root,
+                config,
+                task_state,
+                diff_result,
+                classification,
+                review_result,
+            )
+        except ReportWriteError as error:
+            self.state_store.remove(
+                hook_input.identity,
+            )
+            return HookOutput(
+                "review_failed",
+                "report_write_failed",
+                f"Review 已结束但报告写入失败，主任务继续：{error}",
+            )
+
         self.state_store.remove(
             hook_input.identity,
         )
@@ -204,7 +246,7 @@ class TaskOrchestrator:
                 (
                     f"{classification.reason}；已完成只读 Review，"
                     f"覆盖 {classification.changed_files} 个文件、"
-                    f"{classification.changed_lines} 行变化"
+                    f"{classification.changed_lines} 行变化；报告：{report_path}"
                 ),
             )
 
@@ -214,15 +256,10 @@ class TaskOrchestrator:
                 "review_failed",
                 (
                     "只读 Review 未完成，主任务继续："
-                    f"{review_result.error or '未知 Reviewer 错误'}"
+                    f"{review_result.error or '未知 Reviewer 错误'}；"
+                    f"报告：{report_path}"
                 ),
             )
-
-        return HookOutput(
-            "skipped",
-            "review_skipped",
-            review_result.error or "Reviewer 本次未运行",
-        )
 
     @staticmethod
     def load_config(

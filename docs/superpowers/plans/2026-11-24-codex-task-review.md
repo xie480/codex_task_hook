@@ -335,42 +335,57 @@ Expected: Review tests pass; no user project mutation is observed.
 
 **Files:**
 - Create: `codex_task_review/report.py`
-- Create: `tests/test_report.py`
+- Create: `codex_task_review/report_format.py`
+- Create: `tests/report_helpers.py`
+- Create: `tests/test_report_format.py`
+- Create: `tests/test_report_writer.py`
+- Create: `tests/test_report_lifecycle.py`
 - Modify: `codex_task_review/orchestrator.py`
+- Modify: `codex_task_review/reviewer.py`
 
 **Interfaces:**
 - `ReviewReportWriter.write(repo_root: Path, config: ReviewConfig, task: TaskState, diff: DiffResult, classification: ClassificationResult, result: ReviewResult) -> Path`.
 - `format_report(...) -> str` always includes P0, P1, P2, P3 headings, even when no issue is returned.
 
-- [ ] **Step 1: Write failing tests for report structure and timing boundary**
+- [x] **Step 1: Write failing tests for report structure and timing boundary**
 
 Assert report path format `.codex/reviews/code-review-YYYY-MM-DD-HH-mm-ss.md`, UTF-8 output, task description, BASE/FINAL Tree IDs, file list, classification, all four severity sections, checked/unchecked sections, raw Reviewer output, and failed Reviewer reason. Use a spy to assert `write()` is called only after `GitSnapshotter.diff()` returns.
 
-- [ ] **Step 2: Run report tests and verify the missing implementation failure**
+- [x] **Step 2: Run report tests and verify the missing implementation failure**
 
-    py -3 -m unittest tests.test_report -v
+    py -3 -m unittest tests.test_report_format tests.test_report_writer tests.test_report_lifecycle -v
 
 Expected: FAIL because `ReviewReportWriter` is not implemented.
 
-- [ ] **Step 3: Implement deterministic Markdown generation**
+- [x] **Step 3: Implement deterministic Markdown generation**
 
 Render paths with forward slashes, escape raw Markdown code fences where needed, include “未发现” for empty P0–P3 sections, and preserve raw Reviewer output under a bounded section. Create the report directory only after BASE/FINAL/Diff are captured; write atomically with UTF-8 and never call Git staging APIs.
 
-- [ ] **Step 4: Finish Stop orchestration and cleanup**
+- [x] **Step 4: Finish Stop orchestration and cleanup**
 
 For no Diff or skipped classifications, output a reason and remove only the current task state. For reviewable Diff, call Reviewer, write success/failed report, remove only the current state, and return `continue: true`. If report writing fails, return a failure message without rerunning snapshot/Diff or blocking the Agent.
 
-- [ ] **Step 5: Run focused and full suites**
+- [x] **Step 5: Run focused and full suites**
 
-    py -3 -m unittest tests.test_report -v
+    py -3 -m unittest tests.test_report_format tests.test_report_writer tests.test_report_lifecycle -v
     py -3 -m unittest discover -s tests -v
 
 Expected: all report, lifecycle, snapshot, classification, and Reviewer tests pass.
 
-- [ ] **Step 6: Commit reports and lifecycle completion**
+- [x] **Step 6: Commit reports and lifecycle completion in reviewable slices**
 
-    git add codex_task_review/report.py codex_task_review/orchestrator.py tests/test_report.py
-    git commit -m "feat：生成任务级 Markdown 审查报告"
+Keep report formatting, file writing, and Stop integration in separate commits so each commit remains independently testable:
+
+    git add codex_task_review/report_format.py codex_task_review/reviewer.py tests/report_helpers.py tests/test_report_format.py
+    git commit -m "feat: 生成 Markdown Review 报告内容"
+    git add codex_task_review/report.py tests/test_report_writer.py
+    git commit -m "feat: 安全写入 Markdown Review 报告"
+    git add codex_task_review/report.py
+    git commit -m "fix: 避免跨平台覆盖同名审查报告"
+    git add codex_task_review/orchestrator.py tests/test_report_lifecycle.py docs/superpowers/plans/2026-11-24-codex-task-review.md
+    git commit -m "feat: 在 Stop 生命周期中保存审查报告"
+
+The writer uses an exclusive same-directory hard-link creation from a fully flushed temporary file, avoiding `os.rename` overwrite behavior on POSIX while preserving collision suffixes on Windows and Unix.
 
 ### Task 8: Add official plugin manifests, Hooks, Marketplace, examples, and README
 
