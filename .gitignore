@@ -7,3 +7,4 @@ dist/
 build/
 .codex/reviews/
 .codex/task-review.json
+.test-tmp/
