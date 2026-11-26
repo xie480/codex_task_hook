@@ -262,28 +262,28 @@ Expected: both commands print one JSON object with `continue: true`; the second 
 **Interfaces:**
 - `classify_task(prompt: str, diff: DiffResult, config: ReviewConfig) -> ClassificationResult` returns `kind`, `should_review`, `reason`, `changed_files`, `changed_lines`, and `risk_evidence`.
 
-- [ ] **Step 1: Write failing tests for every required classification branch**
+- [x] **Step 1: Write failing tests for every required classification branch**
 
 Add tests for no changes, small explicit Bug fix, oversized Bug fix, three-file threshold, pure CSS/SCSS/UI text changes, JSX with API/state/validation/persistence logic, new feature, refactor, high-risk paths/keywords, and `[review:force]` overriding every skip.
 
-- [ ] **Step 2: Run the classifier tests and confirm the missing implementation failure**
+- [x] **Step 2: Run the classifier tests and confirm the missing implementation failure**
 
     py -3 -m unittest tests.test_classifier -v
 
 Expected: FAIL because `classify_task` is not defined.
 
-- [ ] **Step 3: Implement the priority-ordered classifier**
+- [x] **Step 3: Implement the priority-ordered classifier**
 
 Normalize prompt and paths case-insensitively, detect force marker first, then no Diff, risk evidence, business logic in UI files, pure UI, simple Bug fix, and default review. Count changed files and `abs(additions) + abs(deletions)` from `DiffResult`; keep risk lists configurable and use conservative default keywords/paths. Add Chinese comments explaining why high-risk evidence wins over skip heuristics.
 
-- [ ] **Step 4: Run focused and full tests**
+- [x] **Step 4: Run focused and full tests**
 
     py -3 -m unittest tests.test_classifier -v
     py -3 -m unittest discover -s tests -v
 
 Expected: all classification assertions and earlier tests pass.
 
-- [ ] **Step 5: Integrate classification into Stop orchestration and commit**
+- [x] **Step 5: Integrate classification into Stop orchestration and commit**
 
 Make Stop return a skip message without invoking Reviewer when `should_review` is false; for reviewable changes, pass the immutable `DiffResult` to the next slice.
 

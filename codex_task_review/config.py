@@ -11,6 +11,7 @@ from typing import Any
 DEFAULT_HIGH_RISK_KEYWORDS = [
     "security",
     "permission",
+    "auth",
     "authorization",
     "authentication",
     "payment",
@@ -19,10 +20,26 @@ DEFAULT_HIGH_RISK_KEYWORDS = [
     "database",
     "migration",
     "concurrency",
+    "thread",
     "cache",
+    "lock",
     "ci",
     "cd",
+    "workflow",
+    "deployment",
     "dependency",
+    "安全",
+    "权限",
+    "认证",
+    "鉴权",
+    "支付",
+    "订单",
+    "财务",
+    "数据库",
+    "迁移",
+    "并发",
+    "缓存",
+    "依赖",
 ]
 
 DEFAULT_HIGH_RISK_PATHS = [
@@ -39,8 +56,16 @@ DEFAULT_HIGH_RISK_PATHS = [
     "infra/",
     "dockerfile",
     "requirements",
+    "package.json",
     "package-lock",
+    "pnpm-lock",
+    "yarn.lock",
     "poetry.lock",
+    "pyproject.toml",
+    "go.mod",
+    "go.sum",
+    "cargo.toml",
+    "cargo.lock",
 ]
 
 

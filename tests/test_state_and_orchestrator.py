@@ -275,7 +275,100 @@ class StateAndOrchestratorTests(unittest.TestCase):
                 )
 
         self.assertIn(
-            "ready_for_classification",
+            "review_required",
+            stop_output.to_dict()["systemMessage"],
+        )
+        self.assertIsNotNone(stored)
+
+    def test_stop_skips_small_bugfix_and_removes_only_its_state(self):
+        """验证简单 Bug 修复跳过 Reviewer 并仅清理当前任务状态。"""
+
+        from codex_task_review.orchestrator import TaskOrchestrator
+        from codex_task_review.state import TaskStateStore
+
+        with temporary_workspace() as workspace:
+            with temporary_git_repository() as repo_root:
+                data_root = workspace / "plugin-data"
+                orchestrator = TaskOrchestrator(data_root)
+                prompt_input = HookInput.from_payload(
+                    {
+                        "hook_event_name": "UserPromptSubmit",
+                        "session_id": "session-skip",
+                        "turn_id": "turn-skip",
+                        "cwd": str(repo_root),
+                        "prompt": "fix a small bug",
+                    }
+                )
+                orchestrator.handle_user_prompt_submit(prompt_input)
+                (repo_root / "src.py").write_text(
+                    "value = 2\n",
+                    encoding="utf-8",
+                )
+                stop_input = HookInput.from_payload(
+                    {
+                        "hook_event_name": "Stop",
+                        "session_id": "session-skip",
+                        "turn_id": "turn-skip",
+                        "cwd": str(repo_root),
+                        "stop_hook_active": False,
+                        "last_assistant_message": "done",
+                    }
+                )
+
+                stop_output = orchestrator.handle_stop(stop_input)
+                stored = TaskStateStore(data_root).load(
+                    stop_input.identity,
+                )
+
+        result = stop_output.to_dict()
+        self.assertIn(
+            "simple_bugfix",
+            result["systemMessage"],
+        )
+        self.assertIsNone(stored)
+
+    def test_stop_retains_state_for_reviewable_diff(self):
+        """验证待 Review 任务保留快照供后续 Reviewer 使用。"""
+
+        from codex_task_review.orchestrator import TaskOrchestrator
+        from codex_task_review.state import TaskStateStore
+
+        with temporary_workspace() as workspace:
+            with temporary_git_repository() as repo_root:
+                data_root = workspace / "plugin-data"
+                orchestrator = TaskOrchestrator(data_root)
+                prompt_input = HookInput.from_payload(
+                    {
+                        "hook_event_name": "UserPromptSubmit",
+                        "session_id": "session-review",
+                        "turn_id": "turn-review",
+                        "cwd": str(repo_root),
+                        "prompt": "add a new feature",
+                    }
+                )
+                orchestrator.handle_user_prompt_submit(prompt_input)
+                (repo_root / "feature.py").write_text(
+                    "def feature():\n    return True\n",
+                    encoding="utf-8",
+                )
+                stop_input = HookInput.from_payload(
+                    {
+                        "hook_event_name": "Stop",
+                        "session_id": "session-review",
+                        "turn_id": "turn-review",
+                        "cwd": str(repo_root),
+                        "stop_hook_active": False,
+                        "last_assistant_message": "done",
+                    }
+                )
+
+                stop_output = orchestrator.handle_stop(stop_input)
+                stored = TaskStateStore(data_root).load(
+                    stop_input.identity,
+                )
+
+        self.assertIn(
+            "review_required",
             stop_output.to_dict()["systemMessage"],
         )
         self.assertIsNotNone(stored)

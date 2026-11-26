@@ -6,6 +6,7 @@ from datetime import datetime
 from datetime import timezone
 from pathlib import Path
 
+from .classifier import classify_task
 from .config import ReviewConfig
 from .git_snapshot import GitRepository
 from .git_snapshot import GitRepositoryError
@@ -158,15 +159,31 @@ class TaskOrchestrator:
                 "本轮没有代码变化，无需启动 Review",
             )
 
-        changed_file_count = len(diff_result.files)
-        changed_line_count = diff_result.changed_lines
+        classification = classify_task(
+            task_state.prompt,
+            diff_result,
+            ReviewConfig.from_repo(
+                repository.root,
+            ),
+        )
+
+        if not classification.should_review:
+            self.state_store.remove(
+                hook_input.identity,
+            )
+            return HookOutput(
+                "skipped",
+                classification.kind,
+                classification.reason,
+            )
 
         return HookOutput(
             "ready",
-            "ready_for_classification",
+            classification.kind,
             (
-                f"已捕获本轮 Diff：{changed_file_count} 个文件，"
-                f"{changed_line_count} 行变化"
+                f"{classification.reason}；本轮 Diff 包含"
+                f"{classification.changed_files} 个文件、"
+                f"{classification.changed_lines} 行变化，待启动 Reviewer"
             ),
         )
 
