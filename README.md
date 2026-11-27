@@ -4,7 +4,7 @@
 
 Codex Task Review 是一个独立的 Codex 插件。它在任务开始时保存仓库快照，在任务结束时只比较本轮变更；符合规则的任务会交由 `codex review -` 检查，并把结果写入仓库内的 Markdown 报告。
 
-插件不会修改用户文件或真实 Git Index，不会自动暂存、提交或阻止主任务继续。
+插件不会修改用户文件或真实 Git Index，也不会自动暂存或提交。Reviewer 成功或失败后，Hook 会让当前会话续跑一次并汇报结果；审查失败不会阻止主任务继续。
 
 > 插件通过 GitHub Marketplace 或本地仓库安装，包含 Codex 生命周期 Hooks。用户必须在 Codex 中检查并信任 Hooks 后，它们才会运行。含生命周期 Hooks 的插件目前不能提交到 OpenAI 公共插件目录。
 
@@ -17,6 +17,16 @@ Codex Task Review 是一个独立的 Codex 插件。它在任务开始时保存�
 5. 插件在仓库内写入 `.codex/reviews/code-review-YYYY-MM-DD-HH-mm-ss.md`。
 
 报告在最终快照和 Diff 完成之后才写入，因此不会混入产生该报告的当前任务 Diff。插件不会修改目标仓库的 `.gitignore`；如果你不希望报告显示为未跟踪文件，可在目标仓库手动忽略 `.codex/reviews/`。
+
+## 当前会话反馈
+
+Stop Hook 执行期间，Codex 会显示 Hook 状态文案。需要审查的任务会同步运行只读 Reviewer；Reviewer 的 CLI 输出不会逐条流式显示。
+
+Reviewer 成功或失败后，插件先写入 Markdown 报告，再要求 Codex 在当前会话续跑一次。续跑消息会包含总体结论、按 P0–P3 分组的 findings 摘要，以及完整报告路径。无发现、审查失败和报告写入失败都会明确标记，不会把失败描述为通过。超长摘要会优先保留高严重级别内容并提示查看完整报告。
+
+本功能默认只向当前会话回传并汇报结果，不自动修复代码。跳过审查的任务会返回跳过原因，不触发额外的模型续跑。因为状态文案覆盖整个 Stop 流程，快速跳过时也可能短暂显示。
+
+审查结束后的续跑会增加一次主 Agent 调用。Reviewer 仍在只读临时工作区运行，原始任务快照、Git Index 和报告写入顺序保持不变。
 
 ## 环境要求
 
