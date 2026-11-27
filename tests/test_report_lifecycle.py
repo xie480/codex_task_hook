@@ -14,10 +14,10 @@ from tests.report_helpers import temporary_workspace
 class ReportTests(unittest.TestCase):
     """验证 Stop 时序、失败安全放行和当前任务状态清理。"""
 
-    def test_report_write_failure_does_not_block_or_repeat_review(
+    def test_report_write_failure_returns_findings_without_faking_a_path(
         self,
     ):
-        """验证报告磁盘故障安全放行并只执行一次 Reviewer。"""
+        """验证报告磁盘故障仍回传 findings，且不伪造报告路径。"""
 
         from codex_task_review.hook_io import HookInput
         from codex_task_review.models import ReviewResult
@@ -73,8 +73,9 @@ class ReportTests(unittest.TestCase):
                 )
 
         result = stop_output.to_dict()
-        self.assertTrue(
-            result["continue"],
+        self.assertEqual(
+            result["decision"],
+            "block",
         )
         self.assertIn(
             "report_write_failed",
@@ -83,6 +84,14 @@ class ReportTests(unittest.TestCase):
         self.assertIn(
             "disk full",
             result["systemMessage"],
+        )
+        self.assertIn(
+            "报告写入失败",
+            result["reason"],
+        )
+        self.assertNotIn(
+            "完整报告：",
+            result["reason"],
         )
         self.assertIsNone(stored)
         review_runner.run.assert_called_once()
@@ -199,13 +208,22 @@ class ReportTests(unittest.TestCase):
             events.index("diff"),
             events.index("report"),
         )
+        stop_result = stop_output.to_dict()
         self.assertIn(
             "review_completed",
-            stop_output.to_dict()["systemMessage"],
+            stop_result["systemMessage"],
         )
         self.assertIn(
             str(report_path),
-            stop_output.to_dict()["systemMessage"],
+            stop_result["systemMessage"],
+        )
+        self.assertEqual(
+            stop_result["decision"],
+            "block",
+        )
+        self.assertIn(
+            str(report_path),
+            stop_result["reason"],
         )
         self.assertIsNone(stored)
         review_runner.run.assert_called_once()

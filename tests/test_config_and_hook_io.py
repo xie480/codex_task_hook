@@ -190,6 +190,37 @@ class ConfigAndHookIoTests(unittest.TestCase):
             },
         )
 
+    def test_hook_output_returns_stop_continuation_when_requested(
+        self,
+    ):
+        """验证显式续跑输出使用 Stop 专用字段且不混入普通放行字段。"""
+
+        from codex_task_review.hook_io import HookOutput
+
+        output = HookOutput(
+            "reviewed",
+            "review_completed",
+            "审查已完成",
+            continuation_reason="请在当前会话汇报审查结果。",
+        ).to_dict()
+
+        self.assertEqual(
+            output["decision"],
+            "block",
+        )
+        self.assertEqual(
+            output["reason"],
+            "请在当前会话汇报审查结果。",
+        )
+        self.assertNotIn(
+            "continue",
+            output,
+        )
+        self.assertIn(
+            "review_completed",
+            output["systemMessage"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

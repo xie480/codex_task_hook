@@ -21,7 +21,7 @@
             "command": "python3 \"${PLUGIN_ROOT}/hooks/task_review.py\"",
             "commandWindows": "py -3 \"${PLUGIN_ROOT}\\hooks\\task_review.py\"",
             "timeout": 600,
-            "statusMessage": "正在进行只读代码审查"
+            "statusMessage": "Codex Task Review：正在检查本轮变更并进行只读审查"
           }
         ]
       }
