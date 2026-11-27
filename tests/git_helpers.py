@@ -12,8 +12,12 @@ from tests.temp_utils import temporary_workspace
 
 @contextmanager
 def temporary_git_repository(
+    temporary_root: Path | None = None,
 ) -> Iterator[Path]:
     """创建含有初始提交的临时 Git 仓库并在测试后回收。
+
+    Args:
+        temporary_root: 可选的临时仓库父目录，用于构造路径边界用例。
 
     Returns:
         上下文管理器，进入时返回临时仓库根目录。
@@ -22,7 +26,7 @@ def temporary_git_repository(
         subprocess.CalledProcessError: Git 初始化或提交命令失败时抛出。
     """
 
-    with temporary_workspace() as workspace:
+    with temporary_workspace(temporary_root) as workspace:
         repo_root = workspace / "临时 Git 仓库"
         repo_root.mkdir()
 

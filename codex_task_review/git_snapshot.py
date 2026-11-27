@@ -23,6 +23,7 @@ from .models import Snapshot
 TREE_ID_PATTERN = re.compile(
     r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$",
 )
+WINDOWS_MAX_PATH = 260
 
 
 class GitRepositoryError(RuntimeError):
@@ -427,8 +428,42 @@ class GitSnapshotter:
             OSError,
             tarfile.TarError,
         ) as error:
+            detail = str(error)
+            failed_path = getattr(
+                error,
+                "filename",
+                None,
+            )
+
+            if (
+                os.name == "nt"
+                and isinstance(
+                    failed_path,
+                    (str, bytes, os.PathLike),
+                )
+            ):
+                failed_path_text = os.fsdecode(
+                    failed_path,
+                )
+                path_character_count = len(
+                    failed_path_text.encode(
+                        "utf-16-le",
+                        errors="surrogatepass",
+                    )
+                ) // 2
+                path_length = path_character_count + 1
+
+                if path_length > WINDOWS_MAX_PATH:
+                    detail = (
+                        "Windows 导出路径可能超过传统 MAX_PATH 限制 "
+                        f"（路径 {path_character_count} 个 UTF-16 单元，含终止符共 "
+                        f"{path_length}，上限 {WINDOWS_MAX_PATH}）："
+                        f"{failed_path_text}。请缩短临时目录路径，或启用 "
+                        "Windows 长路径支持后重启 Codex。"
+                    )
+
             raise GitRepositoryError(
-                f"无法导出 Tree {tree_id}: {error}"
+                f"无法导出 Tree {tree_id}: {detail}"
             ) from error
 
     def _create_temporary_index_path(

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import shutil
 import stat
 import subprocess
 import tempfile
-import uuid
 from pathlib import Path
 from typing import Callable
 
@@ -22,6 +22,9 @@ from .models import ReviewResult
 
 ProcessRunner = Callable[..., subprocess.CompletedProcess[bytes]]
 TEMPORARY_DIRECTORY_ATTEMPTS = 10
+TEMPORARY_DIRECTORY_PREFIX = "ctr-"
+TEMPORARY_DIRECTORY_RANDOM_BYTES = 8
+REVIEW_SNAPSHOT_DIRECTORY = "snapshot"
 
 
 class ReviewRunner:
@@ -112,7 +115,7 @@ class ReviewRunner:
 
         try:
             temporary_workspace = self._create_temporary_workspace()
-            review_root = temporary_workspace / "final-snapshot"
+            review_root = temporary_workspace / REVIEW_SNAPSHOT_DIRECTORY
             repository = GitRepository.find(
                 repo_root,
             )
@@ -262,7 +265,8 @@ class ReviewRunner:
 
         for _ in range(TEMPORARY_DIRECTORY_ATTEMPTS):
             workspace_path = parent / (
-                f"codex-task-review-{uuid.uuid4().hex}"
+                f"{TEMPORARY_DIRECTORY_PREFIX}"
+                f"{secrets.token_hex(TEMPORARY_DIRECTORY_RANDOM_BYTES)}"
             )
 
             try:

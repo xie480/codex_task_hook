@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -595,6 +596,131 @@ class ReviewerTests(unittest.TestCase):
         self.assertEqual(
             calls,
             [],
+        )
+
+    def test_review_exports_deep_tree_file_with_short_workspace_path(
+        self,
+    ):
+        """验证默认 Windows 路径限制下也能导出深层仓库文件。"""
+
+        from codex_task_review.git_snapshot import GitRepository
+        from codex_task_review.git_snapshot import GitSnapshotter
+        from codex_task_review.git_snapshot import WINDOWS_MAX_PATH
+        from codex_task_review.reviewer import ReviewRunner
+
+        relative_path = Path(
+            "aiep/aiep_k12/server/agents/new/skills/releases/"
+            "2ca20bb34dcf7a68bfcf4b261f3b9f5d7c9bbd34473065ed96f863b2591b7f53/"
+            "package/examples/arcade-cabinet/arcade-cabinet.css"
+        )
+        temporary_root = Path(
+            tempfile.gettempdir(),
+        )
+        observed_files: list[tuple[bool, int, bytes]] = []
+
+        with temporary_git_repository(temporary_root) as repo_root:
+            deep_file = repo_root / relative_path
+            deep_file.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            deep_file.write_bytes(
+                b".arcade-cabinet { color: blue; }\n",
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "add",
+                    "--",
+                    relative_path.as_posix(),
+                ],
+                cwd=repo_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "commit",
+                    "-m",
+                    "add deep path fixture",
+                ],
+                cwd=repo_root,
+                check=True,
+                capture_output=True,
+            )
+
+            snapshotter = GitSnapshotter(
+                GitRepository.find(repo_root),
+            )
+            base_snapshot = snapshotter.capture()
+            (repo_root / "baseline.txt").write_text(
+                "review task change\n",
+                encoding="utf-8",
+            )
+            final_snapshot = snapshotter.capture()
+            diff = snapshotter.diff(
+                base_snapshot.tree_id,
+                final_snapshot.tree_id,
+            )
+
+            def fake_process(
+                command,
+                *,
+                cwd,
+                input,
+                capture_output,
+                timeout,
+                env,
+                check,
+            ):
+                exported_file = Path(cwd) / relative_path
+                observed_files.append(
+                    (
+                        exported_file.is_file(),
+                        len(str(exported_file)) + 1,
+                        exported_file.read_bytes(),
+                    )
+                )
+
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    b"No findings",
+                    b"",
+                )
+
+            result = ReviewRunner(
+                temporary_root,
+                process_runner=fake_process,
+                codex_path="codex-test",
+            ).run(
+                repo_root,
+                final_snapshot.tree_id,
+                diff,
+                "review deep path fixture",
+                ReviewConfig.defaults(),
+            )
+
+        self.assertEqual(
+            result.status,
+            "completed",
+            result.error,
+        )
+        self.assertEqual(
+            len(observed_files),
+            1,
+        )
+        self.assertTrue(
+            observed_files[0][0],
+        )
+        self.assertLessEqual(
+            observed_files[0][1],
+            WINDOWS_MAX_PATH,
+        )
+        self.assertIn(
+            b".arcade-cabinet { color: blue; }",
+            observed_files[0][2],
         )
 
 
