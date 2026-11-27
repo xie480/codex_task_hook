@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tests.git_helpers import temporary_git_repository
 
@@ -355,6 +358,56 @@ class GitSnapshotTests(unittest.TestCase):
                 "HEAD",
             ):
                 snapshotter.capture()
+
+    @unittest.skipUnless(
+        os.name == "nt",
+        "Windows 路径长度诊断仅适用于 Windows",
+    )
+    def test_export_error_explains_windows_max_path_limit(
+        self,
+    ):
+        """验证超长 Windows 导出路径返回可操作的错误说明。"""
+
+        from codex_task_review.git_snapshot import GitRepository
+        from codex_task_review.git_snapshot import GitRepositoryError
+        from codex_task_review.git_snapshot import GitSnapshotter
+        from codex_task_review.git_snapshot import WINDOWS_MAX_PATH
+
+        with temporary_git_repository(
+            Path(tempfile.gettempdir()),
+        ) as repo_root:
+            snapshotter = GitSnapshotter(
+                GitRepository.find(repo_root),
+            )
+            snapshot = snapshotter.capture()
+            long_path = "C:\\" + ("x" * (WINDOWS_MAX_PATH - len("C:\\")))
+            expected_path_length = len(long_path) + 1
+
+            with patch(
+                "pathlib.Path.write_bytes",
+                side_effect=FileNotFoundError(
+                    2,
+                    "No such file or directory",
+                    long_path,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    GitRepositoryError,
+                    "MAX_PATH",
+                ) as error_context:
+                    snapshotter.export_tree(
+                        snapshot.tree_id,
+                        repo_root.parent / "long-path-export",
+                    )
+
+        self.assertIn(
+            str(expected_path_length),
+            str(error_context.exception),
+        )
+        self.assertIn(
+            long_path,
+            str(error_context.exception),
+        )
 
 
 if __name__ == "__main__":
