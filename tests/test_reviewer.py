@@ -93,6 +93,9 @@ class ReviewerTests(unittest.TestCase):
                 )
                 temporary_root = workspace / "review-workspaces"
                 calls: list[dict[str, object]] = []
+                review_config = ReviewConfig.defaults()
+                review_config.review_model = "gpt-5-codex"
+                review_config.review_reasoning_effort = "high"
 
                 def fake_process(
                     command,
@@ -183,7 +186,7 @@ class ReviewerTests(unittest.TestCase):
                     final_tree,
                     diff,
                     "add a feature",
-                    ReviewConfig.defaults(),
+                    review_config,
                 )
 
                 final_status = subprocess.run(
@@ -230,6 +233,15 @@ class ReviewerTests(unittest.TestCase):
         self.assertEqual(
             command[sandbox_position + 1],
             "read-only",
+        )
+        self.assertEqual(
+            command[1:5],
+            [
+                "-c",
+                'review_model="gpt-5-codex"',
+                "-c",
+                'model_reasoning_effort="high"',
+            ],
         )
         self.assertNotEqual(
             invocation["cwd"],
@@ -285,6 +297,45 @@ class ReviewerTests(unittest.TestCase):
             review_workspace_entries,
             [],
         )
+
+    def test_default_review_does_not_add_cli_config_overrides(
+        self,
+    ):
+        """验证默认配置不向 Codex CLI 追加模型或推理强度覆盖。"""
+
+        from codex_task_review.reviewer import ReviewRunner
+
+        with temporary_workspace() as workspace:
+            with temporary_git_repository() as repo_root:
+                repository, final_tree, diff = prepare_review_data(
+                    repo_root,
+                )
+                commands: list[list[str]] = []
+
+                def fake_process(command, **kwargs):
+                    commands.append(command)
+                    return subprocess.CompletedProcess(
+                        command,
+                        0,
+                        b"No findings",
+                        b"",
+                    )
+
+                result = ReviewRunner(
+                    workspace / "review-workspaces",
+                    process_runner=fake_process,
+                    codex_path="codex-test",
+                ).run(
+                    repository.root,
+                    final_tree,
+                    diff,
+                    "add a feature",
+                    ReviewConfig.defaults(),
+                )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(len(commands), 1)
+        self.assertNotIn("-c", commands[0])
 
     def test_missing_codex_returns_failed_result_without_launching(
         self,

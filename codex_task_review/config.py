@@ -69,6 +69,10 @@ DEFAULT_HIGH_RISK_PATHS = [
 ]
 
 
+class InvalidReviewConfigError(ValueError):
+    """表示 Reviewer 的显式模型或推理强度配置无效。"""
+
+
 @dataclass
 class ReviewConfig:
     """保存任务分类、Reviewer 和报告输出所需的可配置参数。"""
@@ -80,6 +84,8 @@ class ReviewConfig:
     force_review_marker: str = "[review:force]"
     report_directory: str = ".codex/reviews"
     review_timeout: int = 600
+    review_model: str | None = None
+    review_reasoning_effort: str | None = None
     max_diff_bytes: int = 1024 * 1024
     high_risk_keywords: list[str] = field(
         default_factory=lambda: list(DEFAULT_HIGH_RISK_KEYWORDS)
@@ -127,6 +133,26 @@ class ReviewConfig:
 
         if not isinstance(raw_config, dict):
             return config
+
+        for field_name in (
+            "review_model",
+            "review_reasoning_effort",
+        ):
+            value = raw_config.get(field_name)
+
+            if value is None:
+                continue
+
+            if not isinstance(value, str) or not value.strip():
+                raise InvalidReviewConfigError(
+                    f"{field_name} 必须是非空字符串或 null"
+                )
+
+            setattr(
+                config,
+                field_name,
+                value.strip(),
+            )
 
         scalar_types: dict[str, type[Any]] = {
             "skip_simple_bugfix": bool,

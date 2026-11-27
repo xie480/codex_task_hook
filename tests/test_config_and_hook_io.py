@@ -24,6 +24,8 @@ class ConfigAndHookIoTests(unittest.TestCase):
         self.assertEqual(config.force_review_marker, "[review:force]")
         self.assertEqual(config.report_directory, ".codex/reviews")
         self.assertEqual(config.review_timeout, 600)
+        self.assertIsNone(config.review_model)
+        self.assertIsNone(config.review_reasoning_effort)
 
     def test_config_loads_valid_project_overrides(
         self,
@@ -41,6 +43,8 @@ class ConfigAndHookIoTests(unittest.TestCase):
                     {
                         "max_bugfix_files": 5,
                         "high_risk_paths": ["billing/", "migrations/"],
+                        "review_model": "gpt-5-codex",
+                        "review_reasoning_effort": "high",
                     }
                 ),
                 encoding="utf-8",
@@ -51,6 +55,61 @@ class ConfigAndHookIoTests(unittest.TestCase):
         self.assertEqual(config.max_bugfix_files, 5)
         self.assertEqual(config.high_risk_paths, ["billing/", "migrations/"])
         self.assertEqual(config.max_bugfix_changed_lines, 80)
+        self.assertEqual(config.review_model, "gpt-5-codex")
+        self.assertEqual(config.review_reasoning_effort, "high")
+
+    def test_null_reviewer_overrides_keep_codex_defaults(
+        self,
+    ):
+        """验证模型与推理强度为 null 时不覆盖 Codex CLI 默认值。"""
+
+        from codex_task_review.config import ReviewConfig
+
+        with temporary_workspace() as repo_root:
+            config_directory = repo_root / ".codex"
+            config_directory.mkdir()
+            (config_directory / "task-review.json").write_text(
+                json.dumps(
+                    {
+                        "review_model": None,
+                        "review_reasoning_effort": None,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            config = ReviewConfig.from_repo(repo_root)
+
+        self.assertIsNone(config.review_model)
+        self.assertIsNone(config.review_reasoning_effort)
+
+    def test_invalid_reviewer_overrides_are_reported(
+        self,
+    ):
+        """验证显式空值或非字符串 Reviewer 配置不会被静默忽略。"""
+
+        from codex_task_review.config import InvalidReviewConfigError
+        from codex_task_review.config import ReviewConfig
+
+        invalid_values = (
+            {"review_model": ""},
+            {"review_model": 7},
+            {"review_reasoning_effort": "  "},
+            {"review_reasoning_effort": False},
+        )
+
+        for invalid_config in invalid_values:
+            with self.subTest(config=invalid_config):
+                with temporary_workspace() as repo_root:
+                    config_directory = repo_root / ".codex"
+                    config_directory.mkdir()
+                    (config_directory / "task-review.json").write_text(
+                        json.dumps(invalid_config),
+                        encoding="utf-8",
+                    )
+
+                    with self.assertRaises(InvalidReviewConfigError):
+                        ReviewConfig.from_repo(repo_root)
 
     def test_invalid_config_keeps_safe_defaults(
         self,

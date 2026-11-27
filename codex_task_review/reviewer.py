@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import stat
@@ -132,13 +133,40 @@ class ReviewRunner:
                 prompt,
                 diff,
             )
-            command = [
-                codex_executable,
-                "--sandbox",
-                "read-only",
-                "review",
-                "-",
-            ]
+            command = [codex_executable]
+
+            if config.review_model is not None:
+                command.extend(
+                    [
+                        "-c",
+                        "review_model="
+                        + json.dumps(
+                            config.review_model,
+                            ensure_ascii=False,
+                        ),
+                    ]
+                )
+
+            if config.review_reasoning_effort is not None:
+                command.extend(
+                    [
+                        "-c",
+                        "model_reasoning_effort="
+                        + json.dumps(
+                            config.review_reasoning_effort,
+                            ensure_ascii=False,
+                        ),
+                    ]
+                )
+
+            command.extend(
+                [
+                    "--sandbox",
+                    "read-only",
+                    "review",
+                    "-",
+                ]
+            )
             process_result = self.process_runner(
                 command,
                 cwd=review_root,

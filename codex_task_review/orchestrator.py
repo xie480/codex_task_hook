@@ -7,6 +7,7 @@ from datetime import timezone
 from pathlib import Path
 
 from .classifier import classify_task
+from .config import InvalidReviewConfigError
 from .config import ReviewConfig
 from .git_snapshot import GitRepository
 from .git_snapshot import GitRepositoryError
@@ -176,9 +177,20 @@ class TaskOrchestrator:
                 "本轮没有代码变化，无需启动 Review",
             )
 
-        config = ReviewConfig.from_repo(
-            repository.root,
-        )
+        try:
+            config = ReviewConfig.from_repo(
+                repository.root,
+            )
+        except InvalidReviewConfigError as error:
+            self.state_store.remove(
+                hook_input.identity,
+            )
+            return HookOutput(
+                "review_failed",
+                "invalid_review_config",
+                f"Reviewer 配置无效，未启动审查，主任务继续：{error}",
+            )
+
         classification = classify_task(
             task_state.prompt,
             diff_result,

@@ -6,5 +6,7 @@
   "force_review_marker": "[review:force]",
   "report_directory": ".codex/reviews",
   "review_timeout": 600,
+  "review_model": null,
+  "review_reasoning_effort": null,
   "max_diff_bytes": 1048576
 }

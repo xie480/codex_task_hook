@@ -424,6 +424,67 @@ class StateAndOrchestratorTests(unittest.TestCase):
         self.assertIsNone(stored)
         review_runner.run.assert_called_once()
 
+    def test_invalid_reviewer_config_cleans_state_without_launching_reviewer(
+        self,
+    ):
+        """验证无效模型配置会明确提示、清理状态且不启动 Reviewer。"""
+
+        from unittest.mock import Mock
+
+        from codex_task_review.orchestrator import TaskOrchestrator
+        from codex_task_review.state import TaskStateStore
+
+        with temporary_workspace() as workspace:
+            with temporary_git_repository() as repo_root:
+                data_root = workspace / "plugin-data"
+                review_runner = Mock()
+                orchestrator = TaskOrchestrator(
+                    data_root,
+                    review_runner=review_runner,
+                )
+                prompt_input = HookInput.from_payload(
+                    {
+                        "hook_event_name": "UserPromptSubmit",
+                        "session_id": "session-invalid-config",
+                        "turn_id": "turn-invalid-config",
+                        "cwd": str(repo_root),
+                        "prompt": "add a new feature",
+                    }
+                )
+                orchestrator.handle_user_prompt_submit(prompt_input)
+                (repo_root / "feature.py").write_text(
+                    "def feature():\n    return True\n",
+                    encoding="utf-8",
+                )
+                config_directory = repo_root / ".codex"
+                config_directory.mkdir()
+                (config_directory / "task-review.json").write_text(
+                    '{"review_model": ""}',
+                    encoding="utf-8",
+                )
+                stop_input = HookInput.from_payload(
+                    {
+                        "hook_event_name": "Stop",
+                        "session_id": "session-invalid-config",
+                        "turn_id": "turn-invalid-config",
+                        "cwd": str(repo_root),
+                        "stop_hook_active": False,
+                        "last_assistant_message": "done",
+                    }
+                )
+
+                stop_output = orchestrator.handle_stop(stop_input)
+                stored = TaskStateStore(data_root).load(
+                    stop_input.identity,
+                )
+
+        result = stop_output.to_dict()
+        self.assertIn("invalid_review_config", result["systemMessage"])
+        self.assertIn("主任务继续", result["systemMessage"])
+        self.assertTrue(result["continue"])
+        self.assertIsNone(stored)
+        review_runner.run.assert_not_called()
+
     def test_hook_entrypoint_returns_one_json_object_for_invalid_input(
         self,
     ):

@@ -112,9 +112,13 @@ Copy-Item examples/task-review.json .codex/task-review.json
 | `force_review_marker` | `[review:force]` | 在任务 Prompt 中强制运行 Reviewer |
 | `report_directory` | `.codex/reviews` | 仓库内报告目录；绝对路径或越界路径会被拒绝 |
 | `review_timeout` | `600` 秒 | 单次 `codex review` 超时 |
+| `review_model` | `null` | 可选；指定 Reviewer 模型，省略或设为 `null` 时沿用 Codex CLI 默认选择 |
+| `review_reasoning_effort` | `null` | 可选；设置 Reviewer 推理强度，省略或设为 `null` 时沿用 Codex CLI 默认值 |
 | `max_diff_bytes` | `1048576` 字节 | 启动 Reviewer 前允许的最大 Diff |
 
-未配置的高风险关键词和路径使用内置默认值。修改 `.codex/task-review.json` 不会改写全局 Codex 设置。
+可将 `review_model` 设为 Codex CLI 支持的模型名；`review_reasoning_effort` 会传给 Codex 的 `model_reasoning_effort` 配置项，具体可选值取决于当前 CLI 与模型。配置的覆盖仅作用于本次 Reviewer 调用，不会改写全局 Codex 设置。显式配置为空字符串或非字符串时，Hook 会提示配置错误、跳过本次 Reviewer 并清理任务状态。
+
+未配置的高风险关键词和路径使用内置默认值。
 
 ## 跳过规则
 
