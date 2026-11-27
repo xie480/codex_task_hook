@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 from datetime import datetime
 from datetime import timezone
+from pathlib import Path
 
 from tests.report_helpers import make_report_data
 from tests.report_helpers import temporary_workspace
@@ -178,6 +179,154 @@ class ReportTests(unittest.TestCase):
         self.assertNotIn(
             oversized_output,
             report,
+        )
+
+    def test_format_session_feedback_contains_findings_and_report_path(
+        self,
+    ):
+        """验证会话摘要包含 finding 定位信息及完整报告路径。"""
+
+        from codex_task_review.report_format import format_session_feedback
+
+        raw_output = "\n".join(
+            [
+                "## P0",
+                "未发现。",
+                "## P1",
+                "### 令牌校验可能绕过",
+                "- 文件：src/auth.py:42",
+                "- 影响：空令牌会被当作有效值。",
+                "- 建议：拒绝空白输入。",
+            ]
+        )
+
+        with temporary_workspace() as workspace:
+            _, _, _, review = make_report_data(
+                workspace,
+                raw_output=raw_output,
+            )
+            report_path = workspace / ".codex" / "reviews" / "review.md"
+            feedback = format_session_feedback(
+                review,
+                report_path,
+            )
+
+        for expected_text in (
+            "只读审查已完成",
+            "P1",
+            "令牌校验可能绕过",
+            "src/auth.py:42",
+            "空令牌会被当作有效值",
+            str(report_path),
+        ):
+            with self.subTest(expected_text=expected_text):
+                self.assertIn(
+                    expected_text,
+                    feedback,
+                )
+
+    def test_format_session_feedback_marks_empty_and_failed_reviews_honestly(
+        self,
+    ):
+        """验证无发现和审查失败反馈不会混淆为同一种结果。"""
+
+        from codex_task_review.report_format import format_session_feedback
+
+        with temporary_workspace() as workspace:
+            _, _, _, no_findings_review = make_report_data(
+                workspace,
+                raw_output="No findings",
+            )
+            no_findings = format_session_feedback(
+                no_findings_review,
+                workspace / "review.md",
+            )
+            _, _, _, empty_review = make_report_data(
+                workspace,
+                raw_output="",
+            )
+            empty = format_session_feedback(
+                empty_review,
+                workspace / "empty-review.md",
+            )
+            _, _, _, failed_review = make_report_data(
+                workspace,
+                review_status="failed",
+                raw_output="partial output",
+                error="Codex CLI 超时",
+            )
+            failed = format_session_feedback(
+                failed_review,
+                workspace / "failed-review.md",
+            )
+
+        self.assertIn(
+            "未发现可操作问题",
+            no_findings,
+        )
+        self.assertIn(
+            "未返回可展示的审查结论",
+            empty,
+        )
+        self.assertNotIn(
+            "未发现可操作问题",
+            empty,
+        )
+        self.assertIn(
+            "审查未完成，不能视为审查通过",
+            failed,
+        )
+        self.assertIn(
+            "Codex CLI 超时",
+            failed,
+        )
+        self.assertIn(
+            "partial output",
+            failed,
+        )
+
+    def test_format_session_feedback_bounds_text_and_preserves_report_path(
+        self,
+    ):
+        """验证 findings 超长时有界截断且报告路径仍保留。"""
+
+        from codex_task_review.report_format import MAX_SESSION_FEEDBACK_BYTES
+        from codex_task_review.report_format import format_session_feedback
+
+        oversized_output = "\n".join(
+            [
+                "## P0",
+                "### Critical",
+                "文件：src/critical.py:1",
+                "证据：" + "危险" * MAX_SESSION_FEEDBACK_BYTES,
+            ]
+        )
+        report_path = "C:/repo/.codex/reviews/code-review-final.md"
+        expected_report_path = str(
+            Path(report_path),
+        )
+
+        with temporary_workspace() as workspace:
+            _, _, _, review = make_report_data(
+                workspace,
+                raw_output=oversized_output,
+            )
+            feedback = format_session_feedback(
+                review,
+                Path(report_path),
+            )
+
+        self.assertLessEqual(
+            len(feedback.encode("utf-8")),
+            MAX_SESSION_FEEDBACK_BYTES,
+        )
+        self.assertIn(
+            "会话摘要已截断",
+            feedback,
+        )
+        self.assertIn(
+            expected_report_path,
+            feedback,
         )
 
 

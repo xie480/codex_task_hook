@@ -15,7 +15,7 @@ from tests.temp_utils import temporary_workspace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 HOOK_ENTRY = PROJECT_ROOT / "hooks" / "task_review.py"
-FAKE_REVIEWER_OUTPUT = "No findings. Deterministic fake Reviewer."
+FAKE_REVIEWER_OUTPUT = "No findings"
 
 
 class HookIntegrationTests(unittest.TestCase):
@@ -116,6 +116,14 @@ class HookIntegrationTests(unittest.TestCase):
                     first_stop["systemMessage"],
                 )
                 self.assertEqual(
+                    first_stop["decision"],
+                    "block",
+                )
+                self.assertIn(
+                    "未发现可操作问题",
+                    first_stop["reason"],
+                )
+                self.assertEqual(
                     first_index,
                     (repo_root / ".git" / "index").read_bytes(),
                 )
@@ -146,6 +154,33 @@ class HookIntegrationTests(unittest.TestCase):
                 self.assertIn(
                     FAKE_REVIEWER_OUTPUT,
                     first_report,
+                )
+                self.assertIn(
+                    str(first_reports[0]),
+                    first_stop["reason"],
+                )
+
+                continuation_stop = self._invoke_hook(
+                    "Stop",
+                    repo_root,
+                    data_root,
+                    fake_bin,
+                    "integration-session",
+                    "turn-one",
+                    "Add an authentication validator.",
+                    stop_hook_active=True,
+                )
+                self.assertNotIn(
+                    "decision",
+                    continuation_stop,
+                )
+                self.assertIn(
+                    "stop_hook_active",
+                    continuation_stop["systemMessage"],
+                )
+                self.assertEqual(
+                    len(list(report_root.glob("*.md"))),
+                    1,
                 )
 
                 second_start = self._invoke_hook(
@@ -310,6 +345,7 @@ class HookIntegrationTests(unittest.TestCase):
         session_id: str,
         turn_id: str,
         prompt: str,
+        stop_hook_active: bool = False,
     ) -> dict[str, object]:
         """以 Codex 的 stdin 和插件环境变量调用实际 Hook 入口。
 
@@ -333,7 +369,7 @@ class HookIntegrationTests(unittest.TestCase):
             "turn_id": turn_id,
             "cwd": str(repo_root),
             "prompt": prompt,
-            "stop_hook_active": False,
+            "stop_hook_active": stop_hook_active,
             "last_assistant_message": "Task finished.",
         }
         environment = os.environ.copy()

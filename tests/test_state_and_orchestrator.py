@@ -234,6 +234,10 @@ class StateAndOrchestratorTests(unittest.TestCase):
             "stop_hook_active",
             output.to_dict()["systemMessage"],
         )
+        self.assertNotIn(
+            "decision",
+            output.to_dict(),
+        )
 
     def test_prompt_submit_stores_snapshot_and_stop_invokes_reviewer(
         self,
@@ -297,9 +301,22 @@ class StateAndOrchestratorTests(unittest.TestCase):
                     stop_input.identity,
                 )
 
+        stop_result = stop_output.to_dict()
         self.assertIn(
             "review_completed",
-            stop_output.to_dict()["systemMessage"],
+            stop_result["systemMessage"],
+        )
+        self.assertEqual(
+            stop_result["decision"],
+            "block",
+        )
+        self.assertIn(
+            "未发现可操作问题",
+            stop_result["reason"],
+        )
+        self.assertIn(
+            "报告：",
+            stop_result["reason"],
         )
         self.assertIsNone(stored)
         review_runner.run.assert_called_once()
@@ -360,10 +377,10 @@ class StateAndOrchestratorTests(unittest.TestCase):
         self.assertIsNone(stored)
         review_runner.run.assert_not_called()
 
-    def test_stop_reports_reviewer_failure_without_blocking_and_cleans_state(
+    def test_stop_returns_reviewer_failure_to_session_and_cleans_state(
         self,
     ):
-        """验证 Reviewer 失败时 Hook 放行并清理本轮状态。"""
+        """验证 Reviewer 失败时当前会话收到错误与报告路径。"""
 
         from unittest.mock import Mock
 
@@ -418,8 +435,17 @@ class StateAndOrchestratorTests(unittest.TestCase):
             "review_failed",
             stop_output.to_dict()["systemMessage"],
         )
-        self.assertTrue(
-            stop_output.to_dict()["continue"],
+        self.assertEqual(
+            stop_output.to_dict()["decision"],
+            "block",
+        )
+        self.assertIn(
+            "审查未完成，不能视为审查通过",
+            stop_output.to_dict()["reason"],
+        )
+        self.assertIn(
+            "Codex CLI unavailable",
+            stop_output.to_dict()["reason"],
         )
         self.assertIsNone(stored)
         review_runner.run.assert_called_once()

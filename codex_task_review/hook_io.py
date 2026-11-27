@@ -134,25 +134,34 @@ class HookInput:
 
 @dataclass(frozen=True)
 class HookOutput:
-    """生成不会阻塞主 Agent 的 Codex 通用 Hook 输出。"""
+    """生成 Codex 通用通知或 Stop 续跑输出。"""
 
     status: str
     reason_code: str
     message: str
+    continuation_reason: str | None = None
 
     def to_dict(
         self,
     ) -> dict[str, Any]:
-        """生成 Codex 通用 Hook 输出对象。
+        """生成普通 Hook 通知或一次 Stop 续跑所需的 JSON 字段。
 
         Returns:
-            始终包含 `continue: true` 和用户可见消息的字典。
+            普通通知包含 `continue: true` 和 `systemMessage`；设置续跑原因时返回
+            Stop 专用的 `decision: block`、`reason` 与 `systemMessage`。
         """
 
-        return {
-            "continue": True,
+        output: dict[str, Any] = {
             "systemMessage": (
                 f"[codex-task-review][{self.status}][{self.reason_code}] "
                 f"{self.message}"
-            ),
+            )
         }
+
+        if self.continuation_reason is None:
+            output["continue"] = True
+        else:
+            output["decision"] = "block"
+            output["reason"] = self.continuation_reason
+
+        return output

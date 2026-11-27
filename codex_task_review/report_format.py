@@ -6,6 +6,7 @@ import json
 import re
 from datetime import datetime
 from datetime import timezone
+from pathlib import Path
 
 from .models import ClassificationResult
 from .models import DiffResult
@@ -14,6 +15,23 @@ from .models import TaskState
 
 
 MAX_REVIEW_OUTPUT_BYTES = 64 * 1024
+MAX_SESSION_FEEDBACK_BYTES = 4 * 1024
+NO_FINDING_PHRASES = frozenset(
+    {
+        "no findings",
+        "no issues found",
+        "no actionable findings",
+        "none",
+        "none.",
+        "无",
+        "无。",
+        "未发现",
+        "未发现。",
+        "未发现问题",
+        "未发现可操作问题",
+        "未发现可操作缺陷",
+    }
+)
 REVIEW_SECTION_PATTERN = re.compile(
     r"^\s{0,3}##\s*(P[0-3]|已检查且未发现问题|未能检查|修复建议汇总)\s*$",
     re.IGNORECASE,
@@ -216,6 +234,239 @@ def format_report(
     )
 
 
+def format_session_feedback(
+    result: ReviewResult,
+    report_path: Path | None = None,
+    report_error: str | None = None,
+) -> str:
+    """生成回传当前会话的有界审查结论与具体 finding 摘要。
+
+    Args:
+        result: Reviewer 的完成状态、原始输出和失败原因。
+        report_path: 已写入的完整报告路径；报告写入失败时为空。
+        report_error: 报告写入失败原因；报告写入成功时为空。
+
+    Returns:
+        保留严重等级与定位信息、并包含报告状态的有界 Markdown 文本。
+    """
+
+    lines = [
+        "Codex Task Review 结果",
+        "",
+    ]
+    bounded_output, output_truncated = _bound_output(
+        result.raw_output,
+    )
+    parsed_sections = _parse_review_sections(
+        bounded_output,
+    )
+
+    if result.status == "completed":
+        lines.append("状态：只读审查已完成。")
+
+        if _reports_no_findings(bounded_output) or _has_only_clear_severity_sections(
+            parsed_sections,
+        ):
+            lines.append("结论：未发现可操作问题。")
+        else:
+            findings: list[tuple[str, str]] = []
+
+            for severity in SEVERITY_HEADINGS:
+                section_text = parsed_sections.get(
+                    severity,
+                    "",
+                ).strip()
+
+                if section_text and not _is_clear_section(section_text):
+                    findings.append(
+                        (
+                            severity,
+                            section_text,
+                        )
+                    )
+
+            if findings:
+                lines.append("结论：发现以下 Reviewer findings。")
+
+                for severity, section_text in findings:
+                    lines.extend(
+                        [
+                            "",
+                            f"### {severity}",
+                            section_text,
+                        ]
+                    )
+            elif bounded_output:
+                lines.extend(
+                    [
+                        "",
+                        "结论：Reviewer 未返回可解析的 P0–P3 章节；以下为其有界原始输出：",
+                        bounded_output,
+                    ]
+                )
+            else:
+                lines.append("结论：Reviewer 未返回可展示的审查结论。")
+
+        if output_truncated:
+            lines.extend(
+                [
+                    "",
+                    "Reviewer 原始输出超过解析上限；会话摘要以当前已解析部分为准。",
+                ]
+            )
+    else:
+        lines.extend(
+            [
+                "状态：只读审查未完成，不能视为审查通过。",
+                f"错误：{_bounded_error_text(result.error)}",
+            ]
+        )
+
+        if bounded_output:
+            lines.extend(
+                [
+                    "",
+                    "Reviewer 部分输出（审查未完成，不能视为完整结果）：",
+                    bounded_output,
+                ]
+            )
+
+    if report_path is not None:
+        report_line = f"完整报告：{report_path}"
+    elif report_error:
+        report_line = (
+            "报告写入失败："
+            + _bounded_error_text(report_error)
+        )
+    else:
+        report_line = "完整报告：未生成。"
+
+    return _bound_session_feedback(
+        "\n".join(lines),
+        report_line,
+    )
+
+
+def _has_only_clear_severity_sections(
+    sections: dict[str, str],
+) -> bool:
+    """判断 Reviewer 是否为每个有输出的等级都明确写出无发现。
+
+    Args:
+        sections: 从 Reviewer 输出提取的 Markdown 章节。
+
+    Returns:
+        至少存在一个 P0–P3 章节且所有非空章节均为明确无发现时返回真。
+    """
+
+    severity_sections = [
+        section.strip()
+        for severity in SEVERITY_HEADINGS
+        if (section := sections.get(severity, "").strip())
+    ]
+
+    return bool(severity_sections) and all(
+        _is_clear_section(section)
+        for section in severity_sections
+    )
+
+
+def _is_clear_section(
+    section_text: str,
+) -> bool:
+    """识别仅表示该等级无发现的常见短语，不解释自由文本语义。
+
+    Args:
+        section_text: P0–P3 章节正文。
+
+    Returns:
+        正文精确匹配已知无发现短语时返回真。
+    """
+
+    normalized = " ".join(
+        section_text.casefold().split()
+    )
+
+    return normalized in NO_FINDING_PHRASES
+
+
+def _bounded_error_text(
+    error_text: str | None,
+) -> str:
+    """将失败文本规范化并限制长度，避免错误输出挤占 findings 摘要。
+
+    Args:
+        error_text: Reviewer 或报告写入器返回的错误文本。
+
+    Returns:
+        单行最多 500 个字符的错误摘要。
+    """
+
+    if not error_text:
+        return "未知错误。"
+
+    normalized = " ".join(
+        error_text.split()
+    )
+
+    if len(normalized) > 500:
+        return normalized[:499] + "…"
+
+    return normalized
+
+
+def _bound_session_feedback(
+    body: str,
+    report_line: str,
+) -> str:
+    """限制会话反馈字节数，并在截断时保留报告状态或路径。
+
+    Args:
+        body: 审查结论和按严重级别排列的 findings 正文。
+        report_line: 完整报告路径或报告写入失败信息。
+
+    Returns:
+        UTF-8 字节数不超过会话上限的反馈文本。
+    """
+
+    complete_text = f"{body}\n\n{report_line}"
+    encoded_text = complete_text.encode(
+        "utf-8",
+        errors="replace",
+    )
+
+    if len(encoded_text) <= MAX_SESSION_FEEDBACK_BYTES:
+        return complete_text
+
+    truncation_note = (
+        "…（会话摘要已截断；剩余内容请查看完整报告。）"
+    )
+    suffix = f"\n\n{truncation_note}\n{report_line}"
+    available_body_bytes = (
+        MAX_SESSION_FEEDBACK_BYTES
+        - len(
+            suffix.encode(
+                "utf-8",
+                errors="replace",
+            )
+        )
+    )
+    truncated_body = encoded_text[
+        :max(0, available_body_bytes)
+    ].decode(
+        "utf-8",
+        errors="ignore",
+    ).rstrip()
+
+    if truncated_body:
+        last_line_break = truncated_body.rfind("\n")
+
+        if last_line_break > 0:
+            truncated_body = truncated_body[:last_line_break]
+
+    return f"{truncated_body}{suffix}"
+
+
 def _format_severity_section(
     severity: str,
     result: ReviewResult,
@@ -345,16 +596,7 @@ def _reports_no_findings(
     normalized = " ".join(
         raw_output.casefold().split()
     )
-    no_finding_phrases = {
-        "no findings",
-        "no issues found",
-        "no actionable findings",
-        "未发现问题",
-        "未发现可操作问题",
-        "未发现可操作缺陷",
-    }
-
-    return normalized in no_finding_phrases
+    return normalized in NO_FINDING_PHRASES
 
 
 def _completion_summary(

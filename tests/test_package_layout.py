@@ -145,6 +145,15 @@ class PackageLayoutTests(unittest.TestCase):
                     0,
                 )
 
+        stop_hook = event_hooks["Stop"][0]["hooks"][0]
+        self.assertIn(
+            "正在检查本轮变更并进行只读审查",
+            stop_hook["statusMessage"],
+        )
+        self.assertFalse(
+            stop_hook.get("async", False),
+        )
+
     def test_marketplace_references_the_github_repository_root(self):
         """验证 Marketplace 使用 Codex 支持的 Git URL 根目录源。"""
 
@@ -257,6 +266,7 @@ class PackageLayoutTests(unittest.TestCase):
             "配置",
             "跳过规则",
             "报告示例",
+            "当前会话反馈",
             "常见问题",
             "Windows",
             "GitHub",
